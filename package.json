@@ -26,6 +26,7 @@
     "babel-register": "^6.6.5",
     "chai": "^3.5.0",
     "css-loader": "^0.23.1",
+    "extract-text-webpack-plugin": "^1.0.1",
     "isomorphic-fetch": "^2.2.1",
     "jsdom": "^8.5.0",
     "jsdom-global": "^1.7.0",
@@ -43,12 +44,11 @@
     "url-loader": "^0.5.7",
     "webpack": "^1.12.14",
     "webpack-bundle-tracker": "0.0.93",
-    "webpack-dev-server": "^1.14.1"
+    "webpack-dev-server": "^1.14.1",
+    "webpack-node-externals": "^1.5.4"
   },
   "dependencies": {
     "babel-polyfill": "^6.16.0",
-    "extract-text-webpack-plugin": "^1.0.1",
-    "uuid": "^2.0.3",
-    "webpack-node-externals": "^1.5.4"
+    "uuid": "^2.0.3"
   }
 }
