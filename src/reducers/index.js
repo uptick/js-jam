@@ -1,7 +1,7 @@
 import { Map } from 'immutable';
 import { combineReducers } from 'redux';
 
-import schema, { DB } from 'models';
+import DB from '../db';
 import { createReducer } from './utils';
 import { flattenObject } from '../utils';
 

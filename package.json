@@ -11,6 +11,7 @@
     "build:prod": "webpack --config webpack/webpack.config.production.js --progress --colors",
     "build": "webpack --config webpack/webpack.config.base.js --progress --colors",
     "watch": "webpack --config webpack/webpack.config.base.js --progress --colors --watch",
+    "watch:prod": "webpack --config webpack/webpack.config.production.js --progress --colors --watch",
     "dev": "node server.js",
     "test": "mocha --require mock-css-modules --require babel-polyfill --harmony-proxies --compilers js:babel-register -R nyan --recursive tests/*.js",
     "prepublish": "npm run build:prod"
@@ -49,6 +50,8 @@
   },
   "dependencies": {
     "babel-polyfill": "^6.16.0",
+    "react": "^15.4.1",
+    "redux-saga": "^0.13.0",
     "uuid": "^2.0.3"
   }
 }

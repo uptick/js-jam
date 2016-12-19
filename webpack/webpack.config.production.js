@@ -5,6 +5,8 @@ var config = require( './webpack.config.base' );
 
 config.output.filename = 'index.js';
 
+config.entry = ['./src/index'];
+
 // Extract CSS modules.
 config.module.loaders[1] = {
     test: /.css$/,
