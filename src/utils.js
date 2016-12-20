@@ -15,6 +15,10 @@ export function toArray( x ) {
   return [x];
 }
 
+export function isRecord( x ) {
+  return isObject( x ) && x._map !== undefined;
+}
+
 export function toList( x ) {
   if( objects instanceof Array )
     return new List( x );

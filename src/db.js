@@ -1,5 +1,3 @@
-require( 'babel-polyfill' );
-
 import { bindActionCreators } from 'redux';
 import uuid from 'uuid';
 import { List, Map } from 'immutable';
@@ -93,8 +91,11 @@ export default class DB {
         tbl.data.get( 'objects' ).forEach( obj => {
           for( const rel of tbl.iterRelated( obj.id, field ) ) {
             let relTbl = this.getTable( rel._type );
-            relTbl.addRelationship( rel.id, relInfo.get( 'relatedName' ), obj );
-            this.saveTable( relTbl );
+            const relName = relInfo.get( 'relatedName' );
+            if( relName ) {
+              relTbl.addRelationship( rel.id, relName, obj );
+              this.saveTable( relTbl );
+            }
           }
         });
       });

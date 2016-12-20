@@ -11,6 +11,9 @@ export const schema = new Schema({
         type: 'author',
         many: true,
         relatedName: 'books'
+      },
+      next: {
+        type: 'book'
       }
     },
     create: () => fetch( 'http://create/' )
@@ -41,6 +44,12 @@ export function getJsonApiData() {
           data: {
             id: 1,
             type: 'author'
+          }
+        },
+        next: {
+          data: {
+            id: 2,
+            type: 'book'
           }
         }
       }

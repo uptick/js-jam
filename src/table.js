@@ -1,8 +1,8 @@
 import { List, Map, Set, fromJS, Record } from 'immutable';
-import { ModelError, toIndexMap } from './utils';
+import { ModelError } from './utils';
 import uuid from 'uuid';
 
-import { getDiffId, ID, isObject } from './utils';
+import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils';
 
 class Table {
 
@@ -21,12 +21,13 @@ class Table {
     if( !indices.has( idField ) )
       throw new ModelError( `idField: ${idField} not found in indices: ${indices}` );
     this.schema = schema;
+    this.model = schema.getModel( type );
     this.idField = idField;
     if( data ) {
       if( Array.isArray( data ) ) {
         this.data = new Map({
           objects: this.schema.toObjects( new List( data ) ),
-          indices: new Map( indices.toJS().map( x => [x, new Map( toIndexMap( data, x ) )] ) )
+          indices: new Map( indices.toJS().map( x => [x, new Map( this._toIndexMap( data, x ) )] ) )
         });
       }
       else if( Map.isMap( data ) )
@@ -40,6 +41,20 @@ class Table {
         indices: new Map( indices.toJS().map( x => [x, new Map()] ) )
       });
     }
+  }
+
+  _toIndexMap( objects, key='id' ) {
+    let index = new Map();
+    if( !isEmpty( objects ) ) {
+      objects.forEach( (item, ii) => {
+        const val = this._valueToIndexable( key, item[key] );
+        if( !index.has( val ) )
+          index = index.set( val, new Set([ ii ]) );
+        else
+          index = index.updateIn([ val ], x => x.add( ii ));
+      });
+    }
+    return index;
   }
 
   /**
@@ -66,7 +81,7 @@ class Table {
    */
   _filterIndices( idOrQuery ) {
     if( !isObject( idOrQuery ) )
-      idOrQuery = { [this.idField]: idOrQuery };
+      idOrQuery = {[this.idField]: idOrQuery};
     let results;
     for( const field in idOrQuery ) {
       let id = idOrQuery[field];
@@ -82,7 +97,7 @@ class Table {
     const index = this.data.getIn( ['indices', field] );
     if( index === undefined )
       throw new ModelError( `Table index not found: ${field}` );
-    const other = index.get( value );
+    const other = index.get( this._valueToIndexable( field, value ) );
     if( other === undefined )
       return new Set();
     if( indices === undefined )
@@ -127,11 +142,19 @@ class Table {
     this.data.get( 'indices' ).forEach( (ii, field) => {
       if( field == this.idField )
         return;
-      const value = object.get( field );
+      const value = this._valueToIndexable( field, object.get( field ) );
       this.data = this.data.updateIn( ['indices', field, value], x => {
         return (x === undefined) ? new Set( [index] ) : x.add( index );
       });
     });
+  }
+
+  _valueToIndexable( field, value ) {
+    if( this.model.fieldIsForeignKey( field ) ) {
+      if( value !== undefined && value !== null )
+        return value._type + '-' + value.id;
+    }
+    return value;
   }
 
   _getIndex( id ) {

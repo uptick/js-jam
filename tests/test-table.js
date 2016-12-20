@@ -1,11 +1,11 @@
 require( 'isomorphic-fetch' );
 console.debug = () => {};
 var assert = require( 'chai' ).assert;
-import { Set } from 'immutable';
+import {Set} from 'immutable';
 import Table from '../src/table';
-import { ID, splitJsonApiResponse } from '../src/utils';
+import {ID, makeId, splitJsonApiResponse} from '../src/utils';
 
-import { schema, getJsonApiData } from './model-fixture';
+import {schema, getJsonApiData} from './model-fixture';
 
 describe( 'Table', function() {
 
@@ -54,6 +54,15 @@ describe( 'Table', function() {
     it( 'works with both id and name', function() {
       assert.deepEqual( tbl.filter( {id: 3, name: 'Frank'} ).toJS()[0].id, 3 );
       assert.deepEqual( tbl.filter( {id: 2, name: 'Frank'} ).toJS(), [] );
+    });
+
+    it( 'works with foreign-keys', function() {
+      data = splitJsonApiResponse( getJsonApiData() );
+      tbl = new Table(
+        'book',
+        {data: data.book, schema, indices: ['id', 'title', 'next']}
+      );
+      assert.deepEqual( tbl.filter( {next: makeId( 'book', 2 )} ).toJS()[0].id, 1 );
     });
   });
 

@@ -1,5 +1,3 @@
-require( 'babel-polyfill' );
-
 import { OrderedSet, Set, Record, fromJS } from 'immutable';
 import uuid from 'uuid';
 
@@ -113,6 +111,13 @@ export default class Model {
         continue;
       yield field;
     }
+  }
+
+  fieldIsForeignKey( field ) {
+    const info = this.relationships.get( field );
+    if( info === undefined )
+      return false;
+    return !info.get( 'many' );
   }
 
   diff( fromObject, toObject ) {
