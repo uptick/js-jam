@@ -67,10 +67,10 @@ export function makeId( typeOrObj, id ) {
 }
 
 export function getDiffId( diff ) {
-  return {
-    _type: diff._type[0] || diff._type[1],
-    id: (diff.id[0] !== undefined) ? diff.id[0] : diff.id[1]
-  };
+  return makeId(
+    diff._type[0] || diff._type[1],
+    (diff.id[0] !== undefined) ? diff.id[0] : diff.id[1]
+  );
 }
 
 export function getDiffOp( diff ) {

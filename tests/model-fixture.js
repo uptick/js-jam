@@ -13,7 +13,12 @@ export const schema = new Schema({
         relatedName: 'books'
       },
       next: {
-        type: 'book'
+        type: 'book',
+        relatedName: 'prev'
+      },
+      authorFK: {
+        type: 'author',
+        relatedName: 'booksFK'
       }
     },
     create: () => fetch( 'http://create/' )

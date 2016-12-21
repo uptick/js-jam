@@ -208,12 +208,12 @@ class Table {
   forEachRelatedObject( id, callback ) {
     const obj = this.get( id );
     const model = this.getModel();
-    for( const field of model.iterForeignKeys() ) {
+    for( const field of model.iterForeignKeys( {includeReverse: true} ) ) {
       const relName = model.relationships.getIn( [field, 'relatedName'] );
       if( obj[field] )
         callback( obj[field], relName );
     }
-    for( const field of model.iterManyToMany() ) {
+    for( const field of model.iterManyToMany( {includeReverse: true} ) ) {
       const relName = model.relationships.getIn( [field, 'relatedName'] );
       for( const rel of obj[field] )
         callback( rel, relName );

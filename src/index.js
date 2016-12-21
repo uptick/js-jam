@@ -6,12 +6,11 @@ import saga from './sagas';
 export { saga };
 
 import * as actions from './actions';
-export { actions };
+import { createAction } from './actions/utils';
+export { actions, createAction };
 
 import reducer from './reducers';
-export { reducer };
-
-import { createAction } from './actions/utils';
-export { createAction };
+import { createReducer } from './reducers/utils';
+export { reducer, createReducer };
 
 export * from './components';

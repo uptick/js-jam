@@ -93,7 +93,13 @@ export default class DB {
             let relTbl = this.getTable( rel._type );
             const relName = relInfo.get( 'relatedName' );
             if( relName ) {
-              relTbl.addRelationship( rel.id, relName, obj );
+              const relObj = relTbl.get( rel.id );
+              if( relObj !== undefined ) {
+                if( !model.fieldIsForeignKey( relName ) )
+                  relTbl.addRelationship( rel.id, relName, obj );
+                else
+                  relTbl.set( relTbl.get( rel.id ).set( relName, obj ) );
+              }
               this.saveTable( relTbl );
             }
           }
@@ -396,26 +402,44 @@ export default class DB {
 
     // Find the model, convert data to JSON API, and send using
     // the appropriate operation.
-    const model = this.schema.getModel( getDiffId( diff )._type );
+    const type = getDiffId( diff )._type;
+    const model = this.schema.getModel( type );
+    if( model === undefined )
+      throw new ModelError( `No model of type "${type}" found during \`commitDiff\`.` );
     const op = getDiffOp( diff );
     const data = model.diffToJsonApi( diff );
 
     // Different method based on operation.
     let promise;
     if( op == 'create' ) {
-      promise = model.ops.create( data )
-                     .then( response => {
-                       const {data} = response;
-                       const id = toArray( data )[0].id;
-                       this.reId( diff._type[1], diff.id[1], id );
-                       return response;
-                     });
+      try {
+        promise = model.ops.create( data )
+                       .then( response => {
+                         const {data} = response;
+                         const id = toArray( data )[0].id;
+                         this.reId( diff._type[1], diff.id[1], id );
+                         return response;
+                       });
+      }
+      catch( err ) {
+        throw new ModelError( `Failed to execute create operation for type "${type}".` );
+      }
     }
     else if( op == 'update' ) {
-      promise = model.ops.update( data.data.id, data );
+      try {
+        promise = model.ops.update( data.data.id, data );
+      }
+      catch( err ) {
+        throw new ModelError( `Failed to execute update operation for type "${type}".` );
+      }
     }
     else if( op == 'remove' ) {
-      promise = model.ops.remove( data.data.id );
+      try {
+        promise = model.ops.remove( data.data.id );
+      }
+      catch( err ) {
+        throw new ModelError( `Failed to execute remove operation for type "${type}".` );
+      }
     }
     else
       throw new ModelError( `Unknown model operation: ${op}` );
@@ -461,6 +485,7 @@ export default class DB {
   }
 
   reId( type, id, newId ) {
+    console.debug( `DB: reId: New ID for ${type}, ${id}: ${newId}` );
 
     // Update the ID of the object itself.
     let tbl = this.getTable( type );
@@ -472,10 +497,17 @@ export default class DB {
     const fromId = makeId( type, id );
     const toId = makeId( type, newId );
     tbl.forEachRelatedObject( newId, (objId, reverseField) => {
+      if( !reverseField )
+        return;
       const obj = this.get( objId );
       const relTbl = this.getTable( obj._type );
-      relTbl.removeRelationship( obj.id, reverseField, fromId );
-      relTbl.addRelationship( obj.id, reverseField, toId );
+      const relModel = relTbl.model;
+      if( !relModel.fieldIsForeignKey( reverseField ) ) {
+        relTbl.removeRelationship( obj.id, reverseField, fromId );
+        relTbl.addRelationship( obj.id, reverseField, toId );
+      }
+      else
+        relTbl.set( obj.set( reverseField, toId ) );
       this.saveTable( relTbl );
     });
 
@@ -500,11 +532,11 @@ export default class DB {
       for( const field of relModel.iterForeignKeys() ) {
         if( diff[field] ) {
           newDiff[field] = [diff[field][0], diff[field][1]];
-          if( diff[field][0] == fromId ) {
+          if( diff[field][0] && diff[field][0].equals( fromId ) ) {
             newDiff[field][0] = toId;
             changed = true;
           }
-          if( diff[field][1] == fromId ) {
+          if( diff[field][1] && diff[field][1].equals( fromId ) ) {
             newDiff[field][1] = toId;
             changed = true;
           }
@@ -513,11 +545,11 @@ export default class DB {
       for( const field of relModel.iterManyToMany() ) {
         if( diff[field] ) {
           newDiff[field] = [diff[field][0], diff[field][1]];
-          if( diff[field][0] && diff[field][0].has( fromId ) ) {
+          if( newDiff[field][0] && newDiff[field][0].has( fromId ) ) {
             newDiff[field][0] = newDiff[field][0].delete( fromId ).add( toId );
             changed = true;
           }
-          if( diff[field][1] && diff[field][1].has( fromId ) ) {
+          if( newDiff[field][1] && newDiff[field][1].has( fromId ) ) {
             newDiff[field][1] = newDiff[field][1].delete( fromId ).add( toId );
             changed = true;
           }

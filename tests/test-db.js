@@ -364,6 +364,19 @@ describe( 'DB', function() {
       assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).author[1].has( makeId( 'author', 2 ) ), false );
       assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).author[1].has( makeId( 'author', 20 ) ), true );
     });
+
+    it( 'works with foreign-keys', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      const id = db.create( {_type: 'book', title: 'Testing'} );
+      const otherId = db.create( {_type: 'book', title: 'Testing', next: id} );
+      assert.deepEqual( db.get( 'book', otherId.id ).next.equals( id ), true );
+      db.reId( 'book', id.id, 20 );
+      assert.deepEqual( db.get( 'book', id.id ), undefined );
+      assert.deepEqual( db.get( 'book', 20 ).id, 20 );
+      assert.deepEqual( db.get( 'book', otherId.id ).next.equals( makeId( 'book', 20 ) ), true );
+      assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).next[1].equals( makeId( 'book', 20 ) ), true );
+    });
   });
 
   describe( 'commitDiff', function() {

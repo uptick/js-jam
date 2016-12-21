@@ -53,8 +53,11 @@ export default class Model {
   }
 
   addReverseRelationship( field, relation ) {
-    this.relationships = this.relationships.set( field, relation );
-    this._makeRecord();
+    if( !this.relationships.has( field ) ) {
+      this.relationships = this.relationships.set( field, relation );
+      this._makeRecord();
+    }
+    // TODO: Check that the fields are compatible.
   }
 
   update( obj, values ) {
@@ -97,18 +100,26 @@ export default class Model {
       yield x;
   }
 
-  *iterManyToMany() {
+  *iterManyToMany( opts ) {
+    const {includeReverse=false} = opts || {};
     for( const field of this.relationships.keys() ) {
-      if( this.relationships.getIn( [field, 'reverse'] ) || !this.relationships.getIn( [field, 'many'] ) )
+      if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
+          || !this.relationships.getIn( [field, 'many'] ) )
+      {
         continue;
+      }
       yield field;
     }
   }
 
-  *iterForeignKeys() {
+  *iterForeignKeys( opts ) {
+    const {includeReverse=false} = opts || {};
     for( const field of this.relationships.keys() ) {
-      if( this.relationships.getIn( [field, 'reverse'] ) || this.relationships.getIn( [field, 'many'] ) )
+      if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
+          || this.relationships.getIn( [field, 'many'] ) )
+      {
         continue;
+      }
       yield field;
     }
   }
