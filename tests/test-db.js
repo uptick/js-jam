@@ -489,26 +489,26 @@ describe( 'DB', function() {
      });
      }); */
 
-  /* describe( 'get', function() {
+  describe( 'get', function() {
 
-     it( 'accepts split type and ID', function() {
-     let db = new DB();
-     db.loadJsonApi( fixture.getJsonApi() );
-     assert.equal( db.get( 'book', 1 ).id, 1 );
-     });
+    it( 'accepts split type and ID', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      assert.equal( db.get( 'book', 1 ).id, 1 );
+    });
 
-     it( 'accepts ID object', function() {
-     let db = new DB();
-     db.loadJsonApi( fixture.getJsonApi() );
-     assert.equal( db.get( {_type: 'book', id: 1} ).id, 1 );
-     });
+    it( 'accepts ID object', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      assert.equal( db.get( {_type: 'book', id: 1} ).id, 1 );
+    });
 
-     it( 'returns undefined when missing', function() {
-     let db = new DB();
-     db.loadJsonApi( fixture.getJsonApi() );
-     assert.equal( db.get( {_type: 'book', id: 100} ), undefined );
-     });
-     }); */
+    it( 'accepts ID record', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      assert.equal( db.get( makeId( 'book', 1 ) ).id, 1 );
+    });
+  });
 
   describe( 'withBlock', function() {
 
