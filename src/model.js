@@ -1,7 +1,7 @@
 import { OrderedSet, Set, Record, fromJS } from 'immutable';
 import uuid from 'uuid';
 
-import { getDiffOp, ID, toArray } from './utils';
+import { getDiffOp, toArray } from './utils';
 
 export default class Model {
 
@@ -67,7 +67,7 @@ export default class Model {
     return obj;
   }
 
-  toObject( objData ) {
+  toObject( objData, db ) {
     let obj = new this._record( objData || {} );
     this.relationships.forEach( (rel, name) => {
       if( rel.get( 'many' ) ) {
@@ -75,11 +75,11 @@ export default class Model {
         if( !OrderedSet.isOrderedSet( val ) && !Set.isSet( val ) )
           val = toArray( val );
         obj = obj.set( name, new OrderedSet(
-          val.map( x => ID( x ) )
+          val.map( x => db.makeId( x ) )
         ));
       }
       else if( obj[name] )
-        obj = obj.set( name, ID( obj[name] ) );
+        obj = obj.set( name, db.makeId( obj[name] ) );
     });
     return obj;
   }

@@ -560,83 +560,64 @@ describe( 'DB', function() {
     });
   });
 
-/* describe( 'relationships', function() {
+  describe( 'addBlock', function() {
 
-   it( 'are stored as immutable sets', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   assert.equal( Set.isSet( db.get( 'book', 2 ).author ), true );
-   });
+    it( 'works', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      db.withBlock( () => {
+        db.update( makeId( 'author', 1 ), {name: 'Billy'} );
+      });
+      db.withBlock( () => {
+        db.update( makeId( 'book', 1 ), {title: 'Testing2'} );
+      });
+      const blocks = db.getBlocks( 2 );
+      db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      assert.notEqual( db.get( 'book', 1 ).title, 'Testing2' );
+      assert.notEqual( db.get( 'author', 1 ).name, 'Billy' );
+      assert.notEqual( db.data.getIn( ['chain', 'diffs'] ).size, 2 );
+      assert.notDeepEqual( db.data.getIn( ['chain', 'blocks'] ).toJS(), [0, 1] );
+      for( const block of blocks )
+        db.addBlock( block );
+      assert.equal( db.get( 'book', 1 ).title, 'Testing2' );
+      assert.equal( db.get( 'author', 1 ).name, 'Billy' );
+      assert.equal( db.data.getIn( ['chain', 'diffs'] ).size, 2 );
+      assert.deepEqual( db.data.getIn( ['chain', 'blocks'] ).toJS(), [0, 1] );
+    });
+  });
 
-   it( 'are stored as objects when only one', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   assert.equal( Set.isSet( db.get( 'book', 1 ).author ), false );
-   });
+  describe( 'relationships', function() {
 
-   it( 'produce diffs with additions and removals', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   let obj = db.get( 'book', 2 );
-   db.set( 'book', {id: 2, author: obj.author.add( {_type: 'author', id: 1} )} );
-   obj = db.get( 'book', 2 );
-   assert.deepEqual( obj.author.toJS(), [
-   {_type: 'author', id: 2},
-   {_type: 'author', id: 3},
-   {_type: 'author', id: 1}
-   ] );
-   assert.deepEqual( db.data.chain.diffs[0][0].object.author.add.size, 0 );
-   assert.deepEqual( db.data.chain.diffs[0][0].object.author.del.size, 1 );
-   assert.deepEqual( db.data.chain.diffs[0][1].object.author.add.size, 1 );
-   assert.deepEqual( db.data.chain.diffs[0][1].object.author.del.size, 0 );
-   db.undo();
-   });
+    it( 'can use JS IDs', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      let obj = db.get( 'book', 3 );
+      db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 2} ) ) );
+      obj = db.get( 'book', 3 );
+      assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}, {_type: 'author', id: 2}] );
+      assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
+      assert.equal( obj.author.toList().get( 1 ), db.data.getIn( ['ids', 'author', 2] ) );
+    });
 
-   it( 'diffs are applied correctly', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   let obj = db.get( 'book', 2 );
-   db.set( 'book', {id: 2, author: obj.author.add( {_type: 'author', id: 1} )} );
-   obj = db.get( 'book', 2 );
-   db.undo();
-   obj = db.get( 'book', 2 );
-   assert.deepEqual( obj.author.toJS(), [
-   {_type: 'author', id: 2},
-   {_type: 'author', id: 3}
-   ] );
-   db.redo();
-   obj = db.get( 'book', 2 );
-   assert.deepEqual( obj.author.toJS(), [
-   {_type: 'author', id: 2},
-   {_type: 'author', id: 3},
-   {_type: 'author', id: 1}
-   ] );
-   });
+    it( 'do not duplicate IDs', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      let obj = db.get( 'book', 3 );
+      db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 1} ) ) );
+      obj = db.get( 'book', 3 );
+      assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}] );
+      assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
+    });
 
-   it( 'can be created from scratch', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   let objId = db.set( 'book', {title: 'hello'} );
-   let obj = db.get( 'book', objId );
-   db.set( {...obj, author: [{_type: 'author', id: 1}, {_type: 'author', id: 2}]} );
-   obj = db.get( 'book', objId );
-   assert.deepEqual( obj.author.toJS(), [
-   {_type: 'author', id: 1},
-   {_type: 'author', id: 2}
-   ] );
-   });
-   });
-
-   describe( 'reverse relationships', function() {
-
-   it( 'are created for foreign-keys', function() {
-   let db = new DB();
-   db.loadJsonApi( fixture.getJsonApi() );
-   const id = db.set( 'book', {title: 'hello', author: {_type: 'book', id: 2}} );
-   assert.deepEqual( db.get( 'book', id ).author, {_type: 'book', id: 2} );
-   assert.deepEqual( db.get( 'author', 2 ).books.toJS(), [{_type: 'book', id: 2}, {_type: 'book', id: id}] );
-   });
-   }); */
+    it( 'convert JS IDs when adding', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
+      let obj = db.get( id );
+      assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
+    });
+  });
 
   /* describe( 'calcOrderedDiffs', function() {
 

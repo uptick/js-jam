@@ -30,6 +30,7 @@ export default class DB {
   reset() {
     this.data = new Map({
       head: new Map(),
+      ids: new Map(),
       chain: new Map({
         diffs: new List(),
         blocks: new List(),
@@ -65,13 +66,11 @@ export default class DB {
     // Now update the head data state to reflect the new server
     // information.
     Object.keys( objects ).forEach( type => {
-      this.data = this.data.updateIn( ['head', type], x => {
-        let tbl = new Table( type, {data: x, schema: this.schema} );
-        objects[type].map( obj => {
-          tbl.set( obj );
-        });
-        return tbl.data;
+      let tbl = this.getTable( type );
+      objects[type].map( obj => {
+        tbl.set( obj );
       });
+      this.saveTable( tbl );
     });
 
     // Recalculate reverse-related fields.
@@ -84,8 +83,7 @@ export default class DB {
   _updateReverseRelationships() {
     this.data.get( 'head' ).forEach( (tblData, type) => {
       let tbl = this.getTable( type );
-      const model = tbl.getModel();
-      model.relationships.forEach( (relInfo, field) => {
+      tbl.model.relationships.forEach( (relInfo, field) => {
         if( relInfo.get( 'reverse' ) )
           return;
         tbl.data.get( 'objects' ).forEach( obj => {
@@ -95,7 +93,7 @@ export default class DB {
             if( relName ) {
               const relObj = relTbl.get( rel.id );
               if( relObj !== undefined ) {
-                if( !model.fieldIsForeignKey( relName ) )
+                if( !tbl.model.fieldIsForeignKey( relName ) )
                   relTbl.addRelationship( rel.id, relName, obj );
                 else
                   relTbl.set( relTbl.get( rel.id ).set( relName, obj ) );
@@ -108,13 +106,40 @@ export default class DB {
     });
   }
 
-  getTable( type ) {
-    const data = this.data.getIn( ['head', type] );
-    return new Table( type, {data, schema: this.schema} );
+  getId( typeOrObject, id ) {
+    id = makeId( typeOrObject, id );
+    return this.data.getIn( ['ids', id._type, id.id], id );
   }
 
-  saveTable( tbl ) {
-    this.data = this.data.setIn( ['head', tbl.getType()], tbl.data );
+  makeId( typeOrObject, id ) {
+    id = makeId( typeOrObject, id );
+    let res = this.data.getIn( ['ids', id._type, id.id] );
+    if( res === undefined ) {
+      this.data = this.data.setIn( ['ids', id._type, id.id], id );
+      res = id;
+    }
+    return res;
+  }
+
+  getModel( type ) {
+    return this.schema.getModel( type );
+  }
+
+  getTable( type ) {
+    const data = this.data.getIn( ['head', type] );
+    return new Table( type, {data, db: this} );
+  }
+
+  saveTable( table ) {
+    this.data = this.data.setIn( ['head', table.getType()], table.data );
+  }
+
+  toObject( data ) {
+    return this.schema.toObject( data, this );
+  }
+
+  toObjects( data ) {
+    return this.schema.toObjects( data, this );
   }
 
   /**
@@ -144,7 +169,7 @@ export default class DB {
       query = {id: idOrQuery};
     }
     const data = this.data.getIn( ['head', type] );
-    return new Table( type, {data, schema: this.schema} ).get( query );
+    return this.getTable( type ).get( query );
   }
 
   getOrCreate( type, query, values ) {
@@ -158,7 +183,7 @@ export default class DB {
       obj = this.get( id );
     }
     else {
-      const model = this.schema.getModel( type );
+      const model = this.getModel( type );
       obj = model.update( obj, values );
       this.update( obj );
     }
@@ -188,17 +213,28 @@ export default class DB {
     }
   }
 
-  getBlockDiffs() {
-    const {chain = {}} = this.data;
-    const {blocks = [], diffs = []} = chain;
-    if( !blocks.length )
+  getBlock( index ) {
+    const blocks = this.data.getIn( ['chain', 'blocks'] );
+    const diffs = this.data.getIn( ['chain', 'diffs'] );
+    if( index === undefined )
+      index = 0;
+    if( !blocks.size || index >= blocks.size )
       return [];
-    return diffs.slice( blocks[blocks.length - 1] );
+    const start = blocks.get( blocks.size - index - 1 );
+    const finish = blocks.get( blocks.size - index );
+    return diffs.slice( start, finish );
+  }
+
+  getBlocks( nBlocks ) {
+    let blocks = [];
+    for( let ii = 0; ii < nBlocks; ++ii )
+      blocks.push( this.getBlock( nBlocks - ii - 1 ) );
+    return blocks;
   }
 
   create( data ) {
-    const model = this.schema.getModel( data._type );
-    let object = model.toObject( data );
+    const model = this.getModel( data._type );
+    let object = this.toObject( data );
     if( object.id === undefined )
       object = object.set( 'id', uuid.v4() );
     const diff = model.diff( undefined, object );
@@ -210,7 +246,7 @@ export default class DB {
     let existing = this.get( full._type, full.id );
     if( existing === undefined )
       throw ModelError( 'Cannot update non-existant object.' );
-    const model = this.schema.getModel( existing._type );
+    const model = this.getModel( existing._type );
 
     let updated;
     if( partial !== undefined ) {
@@ -221,7 +257,7 @@ export default class DB {
       }
     }
     else
-      updated = model.toObject( full );
+      updated = this.toObject( full );
 
     const diff = model.diff( existing, updated );
     if( diff )
@@ -243,8 +279,8 @@ export default class DB {
     }
     else
       type = typeOrObject;
-    const model = this.schema.getModel( type );
-    let object = this.get( makeId( type, id ) );
+    const model = this.getModel( type );
+    let object = this.makeId( type, id );
     const diff = model.diff( object, undefined );
     this.addDiff( diff );
   }
@@ -286,18 +322,11 @@ export default class DB {
     this.data = this.data.setIn( ['chain', 'current'], current + 1 );
   }
 
-  applyBlock( block ) {
+  addBlock( block ) {
+    const offset = this.data.getIn( ['chain', 'diffs'] ).size;
     for( const diff of block )
-      this.applyDiff( diff );
-    const {chain = {}} = this.data;
-    const {blocks = []} = chain;
-    this.data = {
-      ...this.data,
-      chain: {
-        ...chain,
-        blocks: [...blocks, chain.current - block.length]
-      }
-    };
+      this.addDiff( diff );
+    this.data = this.data.updateIn( ['chain', 'blocks'], x => x.push( offset ) );
   }
 
   addDiff( diff ) {
@@ -322,7 +351,7 @@ export default class DB {
     const ii = reverse ? 1 : 0;
     const jj = reverse ? 0 : 1;
     const id = getDiffId( diff );
-    const model = this.schema.getModel( id._type );
+    const model = this.getModel( id._type );
     for( const field of model.iterFields() ) {
       if( diff[field] === undefined )
         continue;
@@ -403,7 +432,7 @@ export default class DB {
     // Find the model, convert data to JSON API, and send using
     // the appropriate operation.
     const type = getDiffId( diff )._type;
-    const model = this.schema.getModel( type );
+    const model = this.getModel( type );
     if( model === undefined )
       throw new ModelError( `No model of type "${type}" found during \`commitDiff\`.` );
     const op = getDiffOp( diff );
@@ -493,9 +522,9 @@ export default class DB {
     this.saveTable( tbl );
 
     // Now update the relationships.
-    const model = this.schema.getModel( type );
-    const fromId = makeId( type, id );
-    const toId = makeId( type, newId );
+    const model = this.getModel( type );
+    const fromId = this.makeId( type, id );
+    const toId = this.makeId( type, newId );
     tbl.forEachRelatedObject( newId, (objId, reverseField) => {
       if( !reverseField )
         return;
@@ -528,7 +557,7 @@ export default class DB {
         newDiff.id[1] = newId;
         changed = true;
       }
-      const relModel = this.schema.getModel( getDiffId( diff )._type );
+      const relModel = this.getModel( getDiffId( diff )._type );
       for( const field of relModel.iterForeignKeys() ) {
         if( diff[field] ) {
           newDiff[field] = [diff[field][0], diff[field][1]];

@@ -319,6 +319,8 @@ export function flattenObject( object ) {
  * Split array of JSON API objects.
  */
 export function splitObjects( objects=[], data={} ) {
+  if( objects === null )
+    return {};
   toArray( objects ).forEach( obj => {
     const { type } = obj;
     if( !(type in data) )

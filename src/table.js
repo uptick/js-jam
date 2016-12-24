@@ -10,24 +10,23 @@ class Table {
    * `data` can be one of: a list of objects, a pre-constructed immutable
    * map containing table data, or undefined.
    */
-  constructor( type, options ) {
+  constructor( type, options={} ) {
+    let {data, db, idField='id', indices} = options;
     this.type = type;
-    let {data, schema, idField='id', indices} = options || {};
-    if( !indices )
-      indices = schema.getModel( type ).indices;
-    if( !indices )
-      indices = ['id'];
-    indices = new Set( indices );
-    if( !indices.has( idField ) )
-      throw new ModelError( `idField: ${idField} not found in indices: ${indices}` );
-    this.schema = schema;
-    this.model = schema.getModel( type );
+    this.db = db;
+    this.model = db.getModel( type );
     this.idField = idField;
+
+    // Figure out what my indices are.
+    this.indices = new Set( indices || this.model.indices || ['id'] );
+    if( !this.indices.has( idField ) )
+      throw new ModelError( `idField: ${idField} not found in indices: ${indices}` );
+
     if( data ) {
       if( Array.isArray( data ) ) {
         this.data = new Map({
-          objects: this.schema.toObjects( new List( data ) ),
-          indices: new Map( indices.toJS().map( x => [x, new Map( this._toIndexMap( data, x ) )] ) )
+          objects: db.toObjects( new List( data ) ),
+          indices: new Map( this.indices.toJS().map( x => [x, new Map( this._toIndexMap( data, x ) )] ) )
         });
       }
       else if( Map.isMap( data ) )
@@ -35,12 +34,15 @@ class Table {
       else
         throw new ModelError( 'Unknown data given to table constructor.' );
     }
-    else {
-      this.data = new Map({
-        objects: new List(),
-        indices: new Map( indices.toJS().map( x => [x, new Map()] ) )
-      });
-    }
+    else
+      this.reset();
+  }
+
+  reset() {
+    this.data = new Map({
+      objects: new List(),
+      indices: new Map( this.indices.toJS().map( x => [x, new Map()] ) )
+    });
   }
 
   _toIndexMap( objects, key='id' ) {
@@ -112,7 +114,7 @@ class Table {
       object.get( 'id' );
     }
     catch( e ) {
-      object = this.schema.toObject( object );
+      object = this.db.toObject( object );
     }
 
     // If the object doesn't exist, just add it on to the end. Don't
@@ -207,7 +209,7 @@ class Table {
 
   forEachRelatedObject( id, callback ) {
     const obj = this.get( id );
-    const model = this.getModel();
+    const model = this.model;
     for( const field of model.iterForeignKeys( {includeReverse: true} ) ) {
       const relName = model.relationships.getIn( [field, 'relatedName'] );
       if( obj[field] )
@@ -233,8 +235,7 @@ class Table {
   *iterRelated( id, field ) {
     const obj = this.get( id );
     if( obj ) {
-      const model = this.schema.getModel( obj._type );
-      if( model.relationships.getIn( [field, 'many'] ) ) {
+      if( this.model.relationships.getIn( [field, 'many'] ) ) {
         for( const rel of obj[field] )
           yield rel;
       }
@@ -248,7 +249,6 @@ class Table {
     const jj = reverse ? 0 : 1;
     const id = getDiffId( diff );
     let obj = this.get( id.id );
-    const model = this.getModel();
 
     // Creation.
     if( diff._type[ii] === undefined ) {
@@ -256,7 +256,7 @@ class Table {
         throw ModelError( 'Trying to create an object that already exists.' );
       let newObj = {};
       Object.keys( diff ).forEach( x => newObj[x] = diff[x][jj] );
-      this.set( model.toObject( newObj ) );
+      this.set( this.db.toObject( newObj ) );
     }
 
     // Removal.
@@ -271,20 +271,23 @@ class Table {
       if( obj === undefined )
         throw ModelError( 'Trying to update an object that doesn\'t exist.' );
       Object.keys( diff ).forEach( x => {
-        const relInfo = model.relationships.get( x );
+        const relInfo = this.model.relationships.get( x );
         if( relInfo && relInfo.get( 'many' ) ) {
-          diff[x][ii].forEach( y => obj = obj.set( x, obj[x].delete( ID( y ) ) ) );
+          diff[x][ii].forEach( y => {
+            if( !obj[x].has( y ) )
+              throw new ModelError( 'Conflict while applying diff.' );
+            obj = obj.set( x, obj[x].delete( ID( y ) ) );
+          });
           diff[x][jj].forEach( y => obj = obj.set( x, obj[x].add( ID( y ) ) ) );
         }
-        else
+        else {
+          if( obj[x] != diff[x][ii] )
+            throw new ModelError( 'Conflict while applying diff.' );
           obj = obj.set( x, diff[x][jj] )
+        }
       });
-      this.set( model.toObject( obj ) );
+      this.set( this.db.toObject( obj ) );
     }
-  }
-
-  getModel() {
-    return this.schema.getModel( this.type );
   }
 
   getType() {

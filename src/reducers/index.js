@@ -21,6 +21,14 @@ const dbReducer = createReducer( null, {
     return db.data;
   },
 
+  MODEL_ADD_BLOCKS( state, action ) {
+    let db = new DB( state );
+    const {blocks} = action;
+    for( const block of blocks )
+      db.addBlock( block );
+    return db.data;
+  },
+
   MODEL_SET_DB( state, action ) {
     return action.payload;
   },

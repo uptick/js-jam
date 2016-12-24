@@ -16,7 +16,7 @@ config.module.loaders[1] = {
 config.plugins = [
 
     // Extract CSS modules.
-    new ExtractTextPlugin( 'react-recurring.min.css', {
+    new ExtractTextPlugin( 'redux-jam.min.css', {
         allChunks: true
     }),
 

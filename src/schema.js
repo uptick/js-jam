@@ -2,7 +2,7 @@ import { Map } from 'immutable';
 
 import DB from './db';
 import Model from './model';
-import { ModelError, makeId } from './utils';
+import { ModelError } from './utils';
 
 export class Schema {
 
@@ -43,23 +43,19 @@ export class Schema {
     return new DB( data, {schema: this} );
   }
 
-  makeId( typeOrObj, id ) {
-    return makeId( typeOrObj, id );
-  }
-
   getModel( type ) {
     return this.models.get( type );
   }
 
-  toObjects( data ) {
-    return data.map( objData => this.toObject( objData ) );
+  toObjects( data, db ) {
+    return data.map( objData => this.toObject( objData, db ) );
   }
 
-  toObject( data ) {
+  toObject( data, db ) {
     const model = this.getModel( data._type );
     if( model === undefined )
       throw new ModelError( `Unknown model type: ${data._type}` );
-    return model.toObject( data );
+    return model.toObject( data, db );
   }
 
         /* calcDiffs( state ) {
