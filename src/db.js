@@ -87,6 +87,11 @@ export default class DB {
         if( relInfo.get( 'reverse' ) )
           return;
         tbl.data.get( 'objects' ).forEach( obj => {
+
+          // `obj` can be null if we've removed some objects.
+          if( obj === null )
+            return;
+
           for( const rel of tbl.iterRelated( obj.id, field ) ) {
             let relTbl = this.getTable( rel._type );
             const relName = relInfo.get( 'relatedName' );
@@ -131,7 +136,7 @@ export default class DB {
   }
 
   saveTable( table ) {
-    this.data = this.data.setIn( ['head', table.getType()], table.data );
+    this.data = this.data.setIn( ['head', table.type], table.data );
   }
 
   toObject( data ) {
@@ -338,12 +343,9 @@ export default class DB {
 
   applyDiff( diff, reverse=false ) {
     const id = getDiffId( diff );
-    this.data = this.data
-                    .updateIn( ['head', id._type], x => {
-                      let tbl = this.getTable( id._type );
-                      tbl.applyDiff( diff, reverse );
-                      return tbl.data;
-                    });
+    let tbl = this.getTable( id._type );
+    tbl.applyDiff( diff, reverse );
+    this.saveTable( tbl );
     this._applyDiffRelationships( diff, reverse );
   }
 

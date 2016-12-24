@@ -4,7 +4,7 @@ var assert = require( 'chai' ).assert;
 import {Set} from 'immutable';
 import Table from '../src/table';
 import DB from '../src/db';
-import {makeId, splitJsonApiResponse} from '../src/utils';
+import {splitJsonApiResponse} from '../src/utils';
 
 import {schema, getJsonApiData} from './model-fixture';
 
@@ -76,7 +76,7 @@ describe( 'Table', function() {
     it( 'works with foreign-keys', function() {
       data = splitJsonApiResponse( getJsonApiData() );
       tbl = new Table( 'book', {data: data.book, db, indices: ['id', 'title', 'next']} );
-      assert.deepEqual( tbl.filter( {next: makeId( 'book', 2 )} ).toJS()[0].id, 1 );
+      assert.deepEqual( tbl.filter( {next: db.makeId( 'book', 2 )} ).toJS()[0].id, 1 );
     });
   });
 
@@ -156,7 +156,7 @@ describe( 'Table', function() {
       let tbl = new Table( 'book', {data: data.book, db, indices: ['id', 'name']} );
       tbl.addRelationship( 1, 'author', {_type: 'author', id: 2} );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[1].id, 2 );
-      tbl.addRelationship( 1, 'author', makeId( 'author', 3 ) );
+      tbl.addRelationship( 1, 'author', db.makeId( 'author', 3 ) );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[2].id, 3 );
     });
   });
@@ -167,12 +167,12 @@ describe( 'Table', function() {
       let data = splitJsonApiResponse( getJsonApiData() );
       let tbl = new Table( 'book', {data: data.book, db, indices: ['id', 'name']} );
       tbl.addRelationship( 1, 'author', {_type: 'author', id: 2} );
-      tbl.addRelationship( 1, 'author', makeId( 'author', 3 ) );
+      tbl.addRelationship( 1, 'author', db.makeId( 'author', 3 ) );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[1].id, 2 );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[2].id, 3 );
       tbl.removeRelationship( 1, 'author', {_type: 'author', id: 2} );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[1].id, 3 );
-      tbl.removeRelationship( 1, 'author', makeId( 'author', 3 ) );
+      tbl.removeRelationship( 1, 'author', db.makeId( 'author', 3 ) );
       assert.deepEqual( tbl.get( 1 ).author.toJS()[1], undefined );
     });
   });

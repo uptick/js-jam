@@ -172,7 +172,7 @@ class Table {
     this.data.get( 'indices' ).forEach( (ii, field) => {
       if( field == this.idField )
         return;
-      const value = object.get( field );
+      const value = this._valueToIndexable( field, object.get( field ) );
 
       // Remove the object's ID from the index.
       this.data = this.data.updateIn( ['indices', field, value], x => x.delete( index ) );
@@ -288,12 +288,6 @@ class Table {
       });
       this.set( this.db.toObject( obj ) );
     }
-  }
-
-  getType() {
-    const obj = this.data.getIn( ['objects', 0] );
-    if( obj )
-      return obj._type;
   }
 }
 

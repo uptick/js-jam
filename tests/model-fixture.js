@@ -21,6 +21,7 @@ export const schema = new Schema({
         relatedName: 'booksFK'
       }
     },
+    indices: ['id', 'next'],
     create: () => fetch( 'http://create/' )
                     .then( response => response.json() ),
     authorAdd: () => fetch( 'http://authorAdd/' )

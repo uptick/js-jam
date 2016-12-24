@@ -617,6 +617,14 @@ describe( 'DB', function() {
       let obj = db.get( id );
       assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
     });
+
+    it( '', function() {
+      let db = new DB( null, {schema} );
+      db.loadJsonApi( getJsonApiData() );
+      let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
+      let obj = db.get( id );
+      assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
+    });
   });
 
   /* describe( 'calcOrderedDiffs', function() {
