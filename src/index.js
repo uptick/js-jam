@@ -2,6 +2,7 @@ import schema from './schema';
 import DB from './db';
 export {schema, DB};
 
+export * from './sagas/utils';
 import saga from './sagas';
 export {saga};
 

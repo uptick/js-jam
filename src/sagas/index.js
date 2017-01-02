@@ -1,8 +1,9 @@
-import { takeLatest } from 'redux-saga';
-import { call, apply, put, take, select } from 'redux-saga/effects';
+import {takeLatest} from 'redux-saga';
+import {call, apply, put, take, select} from 'redux-saga/effects';
 
-import { makeId } from '../utils';
+import {makeId} from '../utils';
 import DB from '../db';
+import {eachInline} from './utils';
 
 function* loadModelView( action ) {
   try {
@@ -40,9 +41,12 @@ function* loadModelView( action ) {
   }
 }
 
-function* sync( action ) {
+/**
+ * Synchronise the current DB against the server.
+ */
+function* sync( payload ) {
   console.debug( 'Model: Sync.' );
-  const schema = action.payload;
+  const {schema} = payload;
   try {
     yield put( {type: 'MODEL_SYNC_REQUEST'} );
     const state = yield select();
@@ -61,16 +65,9 @@ function* sync( action ) {
   }
 }
 
-function* watchSync() {
-  while( true ) {
-    const action = yield take( 'MODEL_SYNC' );
-    yield call( sync, action );
-  }
-}
-
 export default function* modelSaga() {
   yield [
     takeLatest( 'MODEL_LOAD_VIEW', loadModelView ),
-    watchSync()
+    eachInline( 'MODEL_SYNC', sync )
   ];
 }
