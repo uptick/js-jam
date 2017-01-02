@@ -8,9 +8,9 @@ export {saga};
 import {toArray} from './utils';
 export {toArray};
 
-import * as actions from './actions';
+export * from './actions';
 import {createAction} from './actions/utils';
-export {actions, createAction};
+export {createAction};
 
 import reducer from './reducers';
 import {createReducer} from './reducers/utils';

@@ -262,7 +262,7 @@ class Table {
     // Removal.
     else if( diff._type[jj] === undefined ) {
       if( obj === undefined )
-        throw ModelError( 'Trying to remove an object that doesn\'t exist.' );
+        throw new ModelError( 'Trying to remove an object that doesn\'t exist.' );
       this.remove( diff.id[ii] );
     }
 

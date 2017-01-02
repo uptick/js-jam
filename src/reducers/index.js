@@ -67,6 +67,31 @@ const dbReducer = createReducer( null, {
        ...rem,
        syncErrors: action.payload
        }; */
+  },
+
+  MODEL_START_TRANSACTION( state, action ) {
+    let db = new DB( state );
+    db.startTransaction( action.name );
+    return {...state, db: db.data};
+  },
+
+  MODEL_SAVE_TRANSACTION( state, action ) {
+    let db = new DB( state );
+    db.saveTransaction( action.transaction );
+    return {...state, db: db.data};
+  },
+
+  MODEL_COMMIT_TRANSACTION( state, action ) {
+    const schema = action.payload.schema;
+    let db = new DB( state, {schema} );
+    db.commitTransaction( action.payload );
+    return db.data;
+  },
+
+  MODEL_ABORT_TRANSACTION( state, action ) {
+    let db = new DB( state );
+    db.abortTransaction( action.name );
+    return {...state, db: db.data};
   }
 });
 

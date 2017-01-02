@@ -3,7 +3,8 @@ import uuid from 'uuid';
 import { List, Map } from 'immutable';
 
 import Table from './table';
-import { toArray, makeId, getDiffOp, getDiffId, isObject, Rollback, ModelError, splitJsonApiResponse } from './utils';
+import { toArray, makeId, getDiffOp, getDiffId, isObject,
+         Rollback, ModelError, splitJsonApiResponse } from './utils';
 import * as modelActions from './actions';
 
 export default class DB {
@@ -31,6 +32,7 @@ export default class DB {
     this.data = new Map({
       head: new Map(),
       ids: new Map(),
+      transactions: new Map(),
       chain: new Map({
         diffs: new List(),
         blocks: new List(),
@@ -186,13 +188,14 @@ export default class DB {
         ...values
       });
       obj = this.get( id );
+      return [obj, true];
     }
     else {
       const model = this.getModel( type );
       obj = model.update( obj, values );
       this.update( obj );
+      return [obj, false];
     }
-    return obj;
   }
 
   /**
@@ -235,6 +238,10 @@ export default class DB {
     for( let ii = 0; ii < nBlocks; ++ii )
       blocks.push( this.getBlock( nBlocks - ii - 1 ) );
     return blocks;
+  }
+
+  getDiffs() {
+    return this.data.getIn( ['chain', 'diffs'] );
   }
 
   create( data ) {
@@ -285,7 +292,7 @@ export default class DB {
     else
       type = typeOrObject;
     const model = this.getModel( type );
-    let object = this.makeId( type, id );
+    let object = this.get( type, id );
     const diff = model.diff( object, undefined );
     this.addDiff( diff );
   }
@@ -591,6 +598,40 @@ export default class DB {
     }
   }
 
+  startTransaction( name ) {
+    if( this.data.hasIn( ['transactions', name] ) )
+      throw ModelError( `Duplicate transaction: ${name}` );
+    const data = this.data.set( 'chain', new Map({
+      diffs: new List(),
+      current: 0
+    }));
+    this.data = this.data.setIn( ['transactions', name], data );
+    return this.getTransaction( name );
+  }
+
+  getTransaction( name ) {
+    if( !this.data.hasIn( ['transactions', name] ) )
+      return;
+    return new Transaction( this, name );
+  }
+
+  saveTransaction( trans ) {
+    this.data = this.data.setIn( ['transactions', trans.name], trans.data );
+  }
+
+  commitTransaction( trans ) {
+    if( typeof trans == 'string' )
+      trans = this.getTransaction( trans );
+    this.addBlock( trans.getDiffs() );
+    this.abortTransaction( trans.name );
+  }
+
+  abortTransaction( trans ) {
+    if( typeof trans != 'string' )
+      trans = trans.name;
+    this.data = this.data.deleteIn( ['transactions', trans] );
+  }
+
   /**
    *
    */
@@ -627,4 +668,12 @@ export default class DB {
      if( diff )
      yield diff;
      } */
+}
+
+class Transaction extends DB {
+
+  constructor( db, name ) {
+    super( db.data.getIn( ['transactions', name] ), {schema: db.schema} );
+    this.name = name;
+  }
 }
