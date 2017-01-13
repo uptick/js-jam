@@ -14,7 +14,7 @@ class Table {
     let {data, db, idField='id', indices} = options;
     this.type = type;
     this.db = db;
-    this.model = db.getModel( type );
+    this.model = db.getModel( type, true );
     this.idField = idField;
 
     // Figure out what my indices are.

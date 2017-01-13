@@ -70,15 +70,17 @@ const dbReducer = createReducer( null, {
   },
 
   MODEL_START_TRANSACTION( state, action ) {
-    let db = new DB( state );
-    db.startTransaction( action.name );
-    return {...state, db: db.data};
+    const schema = action.payload.schema;
+    let db = new DB( state, {schema} );
+    db.startTransaction( action.payload );
+    return db.data;
   },
 
   MODEL_SAVE_TRANSACTION( state, action ) {
-    let db = new DB( state );
-    db.saveTransaction( action.transaction );
-    return {...state, db: db.data};
+    const schema = action.payload.schema;
+    let db = new DB( state, {schema} );
+    db.saveTransaction( action.payload );
+    return db.data;
   },
 
   MODEL_COMMIT_TRANSACTION( state, action ) {
@@ -89,9 +91,10 @@ const dbReducer = createReducer( null, {
   },
 
   MODEL_ABORT_TRANSACTION( state, action ) {
-    let db = new DB( state );
-    db.abortTransaction( action.name );
-    return {...state, db: db.data};
+    const schema = action.payload.schema;
+    let db = new DB( state, {schema} );
+    db.abortTransaction( action.payload );
+    return db.data;
   }
 });
 

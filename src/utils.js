@@ -1,6 +1,12 @@
 import { List, Map, Set, Record } from 'immutable';
 import uuid from 'uuid';
 
+export function isIterable( x ) {
+  if( x === null )
+    return false;
+  return typeof x[Symbol.iterator] === 'function';
+}
+
 export function isObject( x ) {
   return typeof x === 'object' && x !== null;
 }

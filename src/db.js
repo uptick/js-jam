@@ -3,7 +3,7 @@ import uuid from 'uuid';
 import { List, Map } from 'immutable';
 
 import Table from './table';
-import { toArray, makeId, getDiffOp, getDiffId, isObject,
+import { toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
          Rollback, ModelError, splitJsonApiResponse } from './utils';
 import * as modelActions from './actions';
 
@@ -32,13 +32,14 @@ export default class DB {
     this.data = new Map({
       head: new Map(),
       ids: new Map(),
-      transactions: new Map(),
       chain: new Map({
         diffs: new List(),
         blocks: new List(),
         current: 0,
         server: 0
-      })
+      }),
+      transactions: new Map(),
+      loads: new List()
     });
   }
 
@@ -55,31 +56,46 @@ export default class DB {
    * Load models from JSON API format.
    */
   loadJsonApi( response ) {
-    const objects = splitJsonApiResponse( response );
+    if( !isIterable( response ) )
+      response = [response];
+    for( const resp of response ) {
+      const objects = splitJsonApiResponse( resp );
 
-    // Cache the latest redo position. We don't want to revert the
-    // state of the DB too far.
-    const current = this.data.getIn( ['chain', 'current'] );
+      // Cache the latest redo position. We don't want to revert the
+      // state of the DB too far.
+      const current = this.data.getIn( ['chain', 'current'] );
 
-    // Walk back the diff chain to get the current data into
-    // server configuration.
-    this.undoAll();
+      // Walk back the diff chain to get the current data into
+      // server configuration.
+      this.undoAll();
 
-    // Now update the head data state to reflect the new server
-    // information.
-    Object.keys( objects ).forEach( type => {
-      let tbl = this.getTable( type );
-      objects[type].map( obj => {
-        tbl.set( obj );
+      // Now update the head data state to reflect the new server
+      // information.
+      Object.keys( objects ).forEach( type => {
+        let tbl = this.getTable( type );
+        objects[type].map( obj => {
+          tbl.set( obj );
+        });
+        this.saveTable( tbl );
       });
-      this.saveTable( tbl );
-    });
 
-    // Recalculate reverse-related fields.
-    this._updateReverseRelationships();
+      // Recalculate reverse-related fields.
+      this._updateReverseRelationships();
 
-    // Replay all the diffs to bring us back to the correct position.
-    this.goto( current );
+      // Replay all the diffs to bring us back to the correct position.
+      this.goto( current );
+
+      // Now we need to handle any current transactions. We do it be replacing
+      // the heads, then replaying the diffs.
+      /* this.data.get( 'transactions' ).forEach( (trans, name) => {
+         trans = this.getTransaction( name );
+         trans.data = trans.data.set( 'head', this.data.get( 'head' ) );
+         let cur = trans.data.getIn( ['chain', 'current'] );
+         trans.data.setIn( ['chain', 'current'], 0 );
+         trans.goto( cur );
+         this.saveTransaction( trans );
+         }); */
+    }
   }
 
   _updateReverseRelationships() {
@@ -120,6 +136,8 @@ export default class DB {
 
   makeId( typeOrObject, id ) {
     id = makeId( typeOrObject, id );
+    if( id._type === undefined || id.id === undefined )
+      return id;
     let res = this.data.getIn( ['ids', id._type, id.id] );
     if( res === undefined ) {
       this.data = this.data.setIn( ['ids', id._type, id.id], id );
@@ -128,8 +146,8 @@ export default class DB {
     return res;
   }
 
-  getModel( type ) {
-    return this.schema.getModel( type );
+  getModel( type, fail=false ) {
+    return this.schema.getModel( type, fail );
   }
 
   getTable( type ) {
@@ -257,7 +275,7 @@ export default class DB {
   update( full, partial ) {
     let existing = this.get( full._type, full.id );
     if( existing === undefined )
-      throw ModelError( 'Cannot update non-existant object.' );
+      throw new ModelError( 'Cannot update non-existant object.' );
     const model = this.getModel( existing._type );
 
     let updated;
@@ -274,6 +292,13 @@ export default class DB {
     const diff = model.diff( existing, updated );
     if( diff )
       this.addDiff( diff );
+  }
+
+  createOrUpdate( obj ) {
+    if( this.get( {_type: obj._type, id: obj.id} ) === undefined )
+      return this.create( obj );
+    else
+      return this.update( obj );
   }
 
   /* getOrCreate( type, query ) {
@@ -622,6 +647,7 @@ export default class DB {
   commitTransaction( trans ) {
     if( typeof trans == 'string' )
       trans = this.getTransaction( trans );
+    this.loadJsonApi( trans.data.get( 'loads', [] ) );
     this.addBlock( trans.getDiffs() );
     this.abortTransaction( trans.name );
   }
@@ -675,5 +701,10 @@ class Transaction extends DB {
   constructor( db, name ) {
     super( db.data.getIn( ['transactions', name] ), {schema: db.schema} );
     this.name = name;
+  }
+
+  loadJsonApi( response ) {
+    super.loadJsonApi( response );
+    this.data = this.data.update( 'loads', x => x.push( response ) );
   }
 }
