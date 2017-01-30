@@ -176,6 +176,8 @@ export default class DB {
   get( typeOrQuery, idOrQuery ) {
     let query, type;
     if( idOrQuery === undefined ) {
+      if( typeOrQuery === undefined )
+        return;
       type = typeOrQuery._type;
       if( typeOrQuery._map !== undefined ) {
         query = {id: typeOrQuery.id};

@@ -1,10 +1,9 @@
-import React, { Component } from 'react';
-import { bindActionCreators } from 'redux';
-import { connect } from 'react-redux';
+import React, {Component} from 'react';
+import {bindActionCreators} from 'redux';
+import {connect} from 'react-redux';
 
 import * as modelActions from '../actions';
 import DB from '../db';
-import { isObject } from '../utils';
 
 /**
  * Higher-order component to automatically insert models loaded
@@ -18,13 +17,14 @@ export default (ComposedComponent, options) => {
   return connect(
 
     state => {
-      const { name, schema } = options || {};
-      const { model = {} } = state;
-      const { views = {} } = model;
+      const {name, schema} = options || {};
+      const {model = {}} = state;
+      const {views = {}} = model;
       const db = new DB( model.db, {schema} );
-      console.debug( 'SyncedComponent: ', views[name] );
+      const content = views[name] || {};
+      console.debug( 'SyncedComponent: ', content );
       return {
-        ...views[name],
+        ...content,
         db
       };
     },
@@ -40,7 +40,7 @@ export default (ComposedComponent, options) => {
        */
       componentWillMount() {
         console.debug( 'SyncedComponent: Loading.' );
-        this.props.loadModelView({ ...options, props: this.props });
+        this.props.loadModelView( {...options, props: this.props} );
       }
 
       render() {

@@ -1,2 +1,2 @@
 import SyncedComponent from './synced-component';
-export { SyncedComponent };
+export {SyncedComponent};

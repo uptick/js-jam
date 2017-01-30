@@ -341,27 +341,24 @@ export function splitObjects( objects=[], data={} ) {
  */
 export function splitJsonApiResponse( response ) {
   let data = splitObjects( response.data );
-  data = splitObjects( response.included, data );
-  return data;
+  return splitObjects( response.included, data );
 }
 
 /**
  * Resolve a relationship.
  */
-/* export function collectRelationships( state, relation, cache = {} ) {
-   const _relations = (relation instanceof Array) ? relation : [ relation ];
+/* function collectRelationships( splitResponse, relationships, cache = {} ) {
    let results = [];
-   _relations.forEach( rel => {
+   toArray( relationships ).forEach( rel => {
 
    // Relationships can be null, meaning they're a foreignkey
    // and there's no value.
    if( rel === null )
    return null;
 
-   let res = getLocal( state, rel.type, rel.id ) ||
-   getServer( state, rel.type, rel.id );
+   let res = (splitResponse[rel.type] || {})[rel.id];
    if( res !== undefined )
-   res = collect( state, res, cache );
+   res = _collectJsonApi( splitResponse, res, cache );
    else
    res = rel.id;
    results.push( res );
@@ -374,9 +371,8 @@ export function splitJsonApiResponse( response ) {
 /**
  * Collect model relationships.
  */
-/* export function collect( state, model, cache = {} ) {
-   const _models = (model instanceof Array) ? model : [ model ]; 
-   let results = _models.map( mod => {
+/* function _collectJsonApi( splitModels, models, cache = {} ) {
+   let results = toArray( models ).map( mod => {
 
    // Check if the object exists in our cache.
    const type = mod.type;
@@ -386,26 +382,25 @@ export function splitJsonApiResponse( response ) {
    // Build the object and insert into cache.
    let obj = {
    id: mod.id,
-   type,
-   attributes: {
+   _type: type,
    ...mod.attributes
-   }
    };
    if( !(type in cache) )
    cache[type] = {};
    cache[type][obj.id] = obj;
 
    // Build relationships.
-   const { relationships = {} } = mod;
-   for( const key of Object.keys( relationships ) )
-   obj.attributes[key] = collectRelationships( state, relationships[key], cache );
+   const {relationships = {}} = mod;
+   for( const key of Object.keys( relationships ) ) {
+   obj[key] = collectRelationships( splitModels, relationships[key], cache );
    return obj;
    });
-   if( model instanceof Array )
+   if( models instanceof Array )
    return results;
    return results[0];
    }
 
-   export function ModelError( message ) {
-   this.message = message;
+   export function collectJsonApi( response ) {
+   const splitModels = splitJsonApiResponse( response );
+   return _collectJsonApi( splitModels, response.data );
    } */
