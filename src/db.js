@@ -463,7 +463,6 @@ export default class DB {
         return;
       diff = diffs.get( server );
     }
-    console.debug( 'DB: committing: ', diff );
 
     // Find the model, convert data to JSON API, and send using
     // the appropriate operation.
@@ -473,6 +472,10 @@ export default class DB {
       throw new ModelError( `No model of type "${type}" found during \`commitDiff\`.` );
     const op = getDiffOp( diff );
     const data = model.diffToJsonApi( diff );
+
+    // Check for valid operation.
+    if( !model.ops || model.ops[op] === undefined )
+      throw new ModelError( `No such operation, ${op}, defined for model type ${type}` );
 
     // Different method based on operation.
     let promise;
