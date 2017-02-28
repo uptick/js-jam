@@ -6,8 +6,7 @@ import * as modelActions from '../actions';
 import DB from '../db';
 
 /**
- * Higher-order component to automatically insert models loaded
- * from a server.
+ *
  */
 export default (ComposedComponent, options) => {
 
@@ -19,12 +18,11 @@ export default (ComposedComponent, options) => {
     state => {
       const {name, schema} = options || {};
       const {model = {}} = state;
-      const {views = {}} = model;
-      const db = new DB( model.db, {schema} );
-      const content = views[name] || {};
+      const db = schema.db( model.db );
+      let trans = db.getTransaction( name );
       return {
-        ...content,
-        db
+        db: trans,
+        originalDB: db
       };
     },
 
@@ -32,21 +30,24 @@ export default (ComposedComponent, options) => {
 
   )(
 
-    class SyncedComponent extends Component {
+    class TransactionComponent extends Component {
 
       /**
-       * Need to load the requried models.
+       * When the component is mounted create the new transaction.
        */
       componentWillMount() {
-        console.debug( 'SyncedComponent: Loading.' );
-        this.props.loadModelView( {...options, props: this.props} );
+        const {name} = options || {};
+        console.debug( `TransactionComponent: start transaction "${name}".` );
+        this.props.startTransaction( name );
       }
 
       render() {
-        return <ComposedComponent { ...this.props } />;
+        const {db} = this.props;
+        if( db )
+          return <ComposedComponent {...this.props} />;
+        else
+          return null;
       }
     }
-
   );
-
 }

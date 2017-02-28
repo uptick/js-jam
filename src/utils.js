@@ -348,59 +348,88 @@ export function splitJsonApiResponse( response ) {
  * Resolve a relationship.
  */
 /* function collectRelationships( splitResponse, relationships, cache = {} ) {
-   let results = [];
-   toArray( relationships ).forEach( rel => {
-
-   // Relationships can be null, meaning they're a foreignkey
-   // and there's no value.
-   if( rel === null )
-   return null;
-
-   let res = (splitResponse[rel.type] || {})[rel.id];
-   if( res !== undefined )
-   res = _collectJsonApi( splitResponse, res, cache );
-   else
-   res = rel.id;
-   results.push( res );
-   });
-   if( relation instanceof Array )
-   return results;
-   return results[0];
-   } */
+ *   let results = [];
+ *   toArray( relationships ).forEach( rel => {
+ * 
+ *     // Relationships can be null, meaning they're a foreignkey
+ *     // and there's no value.
+ *     if( rel === null )
+ *       return null;
+ * 
+ *     let res = (splitResponse[rel.type] || {})[rel.id];
+ *     if( res !== undefined )
+ *       res = _collectJsonApi( splitResponse, res, cache );
+ *     else
+ *       res = rel.id;
+ *     results.push( res );
+ *   });
+ *   if( relation instanceof Array )
+ *     return results;
+ *   return results[0];
+ * }*/
 
 /**
  * Collect model relationships.
  */
 /* function _collectJsonApi( splitModels, models, cache = {} ) {
-   let results = toArray( models ).map( mod => {
+ *   let results = toArray( models ).map( mod => {
+ * 
+ *     // Check if the object exists in our cache.
+ *     const type = mod.type;
+ *     if( type in cache && mod.id in cache[type] )
+ *       return cache[type][mod.id];
+ * 
+ *     // Build the object and insert into cache.
+ *     let obj = {
+ *       id: mod.id,
+ *       _type: type,
+ *       ...mod.attributes
+ *     };
+ *     if( !(type in cache) )
+ *       cache[type] = {};
+ *     cache[type][obj.id] = obj;
+ * 
+ *     // Build relationships.
+ *     const {relationships = {}} = mod;
+ *     for( const key of Object.keys( relationships ) ) {
+ *       obj[key] = collectRelationships( splitModels, relationships[key], cache );
+ *       return obj;
+ *     });
+ *     if( models instanceof Array )
+ *       return results;
+ *     return results[0];
+ *   }
+ * }*/
 
-   // Check if the object exists in our cache.
-   const type = mod.type;
-   if( type in cache && mod.id in cache[type] )
-   return cache[type][mod.id];
+export function collectJsonApi( response ) {
+  const splitModels = splitJsonApiResponse( response );
+  let map = {};
+  Object.keys( splitModels ).map( type => {
+    map[type] = toIndexMap( splitModels[type] );
+  });
 
-   // Build the object and insert into cache.
-   let obj = {
-   id: mod.id,
-   _type: type,
-   ...mod.attributes
-   };
-   if( !(type in cache) )
-   cache[type] = {};
-   cache[type][obj.id] = obj;
+  function _doObject( obj ) {
+    if( map[obj.type] === undefined || map[obj.type].get( obj.id ) == undefined )
+      return {_type: obj.type, id: obj.id};
+    let idx = map[obj.type].get( obj.id );
+    let mod = splitModels[obj.type][idx.first()];
+    Object.keys( obj.relationships ).map( relName => {
+      let rels = obj.relationships[relName].data;
+      let relMods = toArray( rels ).map( relObj => {
+        return _doObject( relObj );
+      });
+      relMods = relMods.filter( x => x !== undefined );
+      if( !Array.isArray( rels ) )
+        relMods = relMods[0];
+      mod[relName] = relMods;
+    });
+    return mod;
+  }
 
-   // Build relationships.
-   const {relationships = {}} = mod;
-   for( const key of Object.keys( relationships ) ) {
-   obj[key] = collectRelationships( splitModels, relationships[key], cache );
-   return obj;
-   });
-   if( models instanceof Array )
-   return results;
-   return results[0];
-   }
-
-   export function collectJsonApi( response ) {
-   const splitModels = splitJsonApiResponse( response );
-   return _collectJsonApi( splitModels, response.data );
-   } */
+  let models = toArray( response.data ).map( obj => {
+    return _doObject( obj );
+  });
+  if( !Array.isArray( response.data ) )
+    models = models[0];
+  return models;
+}

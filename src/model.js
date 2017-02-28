@@ -166,7 +166,7 @@ export default class Model {
         else {
           const relInfo = this.relationships.get( field );
           if( relInfo ) {
-            if( diff[field][0].equals( diff[field][1] ) )
+            if( diff[field][0] && diff[field][0].equals( diff[field][1] ) )
               delete diff[field];
             else if( relInfo && relInfo.get( 'many' ) ) {
               size += 1;

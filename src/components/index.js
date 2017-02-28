@@ -1,2 +1,3 @@
 import DBComponent from './db-component';
-export {DBComponent};
+import TransactionComponent from './transaction-component';
+export {DBComponent, TransactionComponent};

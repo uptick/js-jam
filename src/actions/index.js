@@ -1,4 +1,4 @@
-import { createAction } from './utils';
+import {createAction} from './utils';
 
 export const startTransaction = createAction( 'MODEL_START_TRANSACTION' );
 export const saveTransaction = createAction( 'MODEL_SAVE_TRANSACTION' );
