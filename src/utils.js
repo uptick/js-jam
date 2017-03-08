@@ -26,7 +26,7 @@ export function isRecord( x ) {
 }
 
 export function toList( x ) {
-  if( objects instanceof Array )
+  if( x instanceof Array )
     return new List( x );
   if( List.isList( x ) )
     return x;
@@ -413,7 +413,7 @@ export function collectJsonApi( response ) {
       return {_type: obj.type, id: obj.id};
     let idx = map[obj.type].get( obj.id );
     let mod = splitModels[obj.type][idx.first()];
-    Object.keys( obj.relationships ).map( relName => {
+    Object.keys( obj.relationships || {} ).map( relName => {
       let rels = obj.relationships[relName].data;
       let relMods = toArray( rels ).map( relObj => {
         return _doObject( relObj );

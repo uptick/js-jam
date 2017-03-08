@@ -3,7 +3,9 @@ import { Schema } from '../src/schema';
 export const schema = new Schema({
   book: {
     attributes: {
-      title: {},
+      title: {
+        required: true
+      },
       pages: {}
     },
     relationships: {
@@ -18,16 +20,19 @@ export const schema = new Schema({
       },
       authorFK: {
         type: 'author',
-        relatedName: 'booksFK'
+        relatedName: 'booksFK',
+        required: true
       }
     },
     indices: ['id', 'next'],
-    create: () => fetch( 'http://create/' )
-                    .then( response => response.json() ),
-    authorAdd: () => fetch( 'http://authorAdd/' )
-                       .then( response => response.json() ),
-    authorRemove: () => fetch( 'http://authorRemove/' )
-                          .then( response => response.json() )
+    ops: {
+      create: () => fetch( 'http://create/' )
+        .then( response => response.json() ),
+      authorAdd: () => fetch( 'http://authorAdd/' )
+        .then( response => response.json() ),
+      authorRemove: () => fetch( 'http://authorRemove/' )
+        .then( response => response.json() )
+    }
   },
   author: {
     attributes: {

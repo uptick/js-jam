@@ -32,18 +32,37 @@ export default (ComposedComponent, options) => {
 
   )(
 
-    class SyncedComponent extends Component {
+    class DBComponent extends Component {
 
-      /**
-       * Need to load the requried models.
-       */
+      constructor( props ) {
+        super( props );
+        this.reload = ::this.reload;
+      }
+
+      reload( props ) {
+        console.debug( 'DBComponent: Loading.' );
+        props.loadModelView( {...options, props} );
+      }
+
       componentWillMount() {
-        console.debug( 'SyncedComponent: Loading.' );
-        this.props.loadModelView( {...options, props: this.props} );
+        this.reload( this.props );
+      }
+
+      componentWillUnmount() {
+        this.props.clearModelView( options );
+      }
+
+      componentWillReceiveProps( nextProps ) {
+        if( this.props.params != nextProps.params )
+          this.reload( nextProps );
       }
 
       render() {
-        return <ComposedComponent { ...this.props } />;
+        return (
+          <ComposedComponent
+              {...this.props}
+          />
+        );
       }
     }
 

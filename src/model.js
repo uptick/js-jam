@@ -1,7 +1,8 @@
 import { OrderedSet, Set, Record, fromJS } from 'immutable';
 import uuid from 'uuid';
 
-import { getDiffOp, toArray } from './utils';
+import Instance from './instance';
+import { getDiffOp, toArray, ModelError } from './utils';
 
 export default class Model {
 
@@ -29,12 +30,14 @@ export default class Model {
       operations.push( field + 'Remove' );
     }
     for( const key of operations ) {
-      if( key in options ) {
-        this.ops[key] = (...args) => options[key]( ...args ).then( data => {
+      if( options.ops && key in options.ops ) {
+        this.ops[key] = (...args) => options.ops[key]( ...args ).then( data => {
           console.debug( `Model: ${key}: `, data );
           return data;
         });
       }
+      else
+        console.error( `Warning: No operation "${key}" on model "${this.type}".` );
     }
   }
 
@@ -65,6 +68,10 @@ export default class Model {
       obj = obj.set( field, values[field] );
     });
     return obj;
+  }
+
+  toInstance( objData, db ) {
+    return new Instance( objData, this, db );
   }
 
   toObject( objData, db ) {
@@ -131,6 +138,12 @@ export default class Model {
     return !info.get( 'many' );
   }
 
+  getField( name ) {
+    if( !this.relationships.has( name ) )
+      throw new ModelError( `Model ${this.type} has no field ${name}.` );
+    return this.relationships.get( name );
+  }
+
   diff( fromObject, toObject ) {
     let diff = {};
 
@@ -142,7 +155,6 @@ export default class Model {
         if( toObject[field] !== undefined )
           diff[field] = [undefined, toObject[field]];
       }
-      return diff;
     }
 
     // Check for remove.
@@ -151,7 +163,6 @@ export default class Model {
         if( fromObject[field] !== undefined )
           diff[field] = [fromObject[field], undefined];
       }
-      return diff;
     }
 
     // Use field differences.
@@ -180,9 +191,11 @@ export default class Model {
             size += 1;
         }
       }
-      if( size )
-        return diff;
+      if( !size )
+        return;
     }
+
+    return diff;
   }
 
   diffToJsonApi( diff ) {

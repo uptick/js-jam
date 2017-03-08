@@ -13,7 +13,7 @@
     "watch": "webpack --config webpack/webpack.config.base.js --progress --colors --watch",
     "watch:prod": "webpack --config webpack/webpack.config.production.js --progress --colors --watch",
     "dev": "node server.js",
-    "test": "mocha --require mock-css-modules --require babel-polyfill --harmony-proxies --compilers js:babel-register -R nyan --recursive tests/*.js",
+    "test": "mocha --require mock-css-modules --require babel-polyfill --compilers js:babel-register -R nyan --recursive tests/*.js",
     "prepublish": "npm run build:prod"
   },
   "author": "Luke Hodkinson",

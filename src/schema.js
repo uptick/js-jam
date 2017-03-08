@@ -50,6 +50,13 @@ export class Schema {
     return model;
   }
 
+  toInstance( data, db ) {
+    const model = this.getModel( data._type );
+    if( model === undefined )
+      throw new ModelError( `Unknown model type: ${data._type}` );
+    return model.toInstance( data, db );
+  }
+
   toObjects( data, db ) {
     return data.map( objData => this.toObject( objData, db ) );
   }

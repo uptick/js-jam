@@ -29,9 +29,17 @@ const dbReducer = createReducer( null, {
     return db.data;
   },
 
-  MODEL_SET_DB( state, action ) {
-    return action.payload;
+  MODEL_LOAD_JSON( state, action ) {
+    const {schema, jsonData} = action.payload;
+    let db = schema.db( state );
+    for( const data of jsonData )
+      db.loadJsonApi( data );
+    return db.data;
   },
+
+  /* MODEL_SET_DB( state, action ) {
+   *   return action.payload;
+   * },*/
 
   MODEL_APPLY_BLOCK( state, action ) {
     let db = new DB( state );
@@ -52,6 +60,27 @@ const dbReducer = createReducer( null, {
       ...state,
       db: db.data
     };
+  },
+
+  MODEL_LOAD_JSON_API_RESPONSE( state, action ) {
+    const {schema, data} = action.payload;
+    let db = schema.db( state );
+    db.loadJsonApiResponse( data );
+    return db.data;
+  },
+
+  MODEL_COMMIT( state, action ) {
+    const {schema} = action.payload;
+    let db = schema.db( state );
+    db.commit();
+    return db.data;
+  },
+
+  MODEL_POST_COMMIT_DIFF( state, action ) {
+    const {response, schema} = action.payload;
+    let db = schema.db( state );
+    db.postCommitDiff( response );
+    return db.data;
   },
 
   MODEL_SYNC_SUCCESS( state, action ) {
@@ -86,14 +115,14 @@ const dbReducer = createReducer( null, {
   MODEL_COMMIT_TRANSACTION( state, action ) {
     const schema = action.payload.schema;
     let db = new DB( state, {schema} );
-    db.commitTransaction( action.payload );
+    db.commitTransaction( action.payload.name );
     return db.data;
   },
 
   MODEL_ABORT_TRANSACTION( state, action ) {
     const schema = action.payload.schema;
     let db = new DB( state, {schema} );
-    db.abortTransaction( action.payload );
+    db.abortTransaction( action.payload.name );
     return db.data;
   }
 });
@@ -118,13 +147,12 @@ const viewReducer = createReducer({}, {
    * Indicates a model view is currently loading.
    */
   MODEL_LOAD_VIEW_REQUEST( state, action ) {
-    const { name } = action.payload;
-    const viewState = state[name] || {};
+    const {name} = action.payload;
+    console.debug( `Model: View load request: ${name}.` );
     return {
       ...state,
       [name]: {
-        ...viewState,
-        loading: true
+        ready: false
       }
     };
   },
@@ -135,14 +163,23 @@ const viewReducer = createReducer({}, {
   MODEL_LOAD_VIEW_SUCCESS( state, action ) {
     const { name, results } = action.payload;
     const viewState = state[name] || {};
-    console.debug( `Model: View load success: ${name}`, results );
+    console.debug( `Model: View load success: ${name}: `, results );
     return {
       ...state,
       [name]: {
         ...viewState,
         ...results,
-        loading: false
+        ready: true
       }
+    };
+  },
+
+  MODEL_LOAD_VIEW_CLEAR( state, action ) {
+    const {name} = action.payload;
+    console.debug( `Model: View load clear: "${name}".` );
+    return {
+      ...state,
+      [name]: {}
     };
   }
 });

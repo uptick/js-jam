@@ -232,6 +232,13 @@ class Table {
     this.data = this.data.updateIn( ['objects', index, field], x => x.delete( ID( related ) ) );
   }
 
+  *iterObjects() {
+    for( const obj of this.data.get( 'objects' ) ) {
+      if( !isEmpty( obj ) )
+        yield obj;
+    }
+  }
+
   *iterRelated( id, field ) {
     const obj = this.get( id );
     if( obj ) {
