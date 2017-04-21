@@ -1,10 +1,10 @@
-import { Map } from 'immutable';
+import {Map} from 'immutable'
 
-import DB from './db';
-import Model from './model';
-import { ModelError } from './utils';
+import DB from './db'
+import Model from './model'
+import {ModelError} from './utils'
 
-export class Schema {
+export default class Schema {
 
   constructor( descr={} ) {
     this.models = new Map();
@@ -27,7 +27,7 @@ export class Schema {
       model.relationships.forEach( (relDescr, field) => {
         if( !relDescr.has( 'relatedName' ) || !relDescr.has( 'type' ) || relDescr.get( 'reverse' ) )
           return;
-        let relModel = this.getModel( relDescr.get( 'type' ) );
+        let relModel = this.getModel( relDescr.get( 'type' ), true );
         relModel.addReverseRelationship( relDescr.get( 'relatedName' ), new Map({
           type: model.type,
           relatedName: field,
@@ -120,7 +120,3 @@ export class Schema {
            return this[type].update( data );
            } */
 }
-
-let schema = new Schema();
-
-export default schema;
