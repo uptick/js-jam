@@ -22,8 +22,14 @@ export default (ComposedComponent, options) => {
       const {views = {}} = model;
       const db = new DB( model.db, {schema} );
       const content = views[name] || {};
+
+      // Default to loading to catch that little moment before we've sent off
+      // the first REQUEST action.
+      const {loading=true, ...rest} = content
+
       return {
-        ...content,
+        ...rest,
+        loading,
         db
       };
     },

@@ -33,7 +33,6 @@ export default class DB {
       head: new Map(),
       tail: new Map(),
       ids: new Map(),
-      removals: new Set(),
       diffs: new List(),
 
       // TODO: Deprecated?
@@ -60,96 +59,116 @@ export default class DB {
   }
 
   /**
+   * Clear the database in preparation for new data.
+   */
+  clear() {
+
+    // Build a set of all outgoing IDs. We don't want to remove any
+    // objects that still have outgoing diffs.
+    let outgoing = this.data.get( 'diffs' )
+                       .filter(
+                         diff =>
+                           getDiffOp( diff ) != 'remove'
+                       )
+                       .map(
+                         diff =>
+                           this.get( getDiffId( diff ) )
+                       )
+
+    // Clear head and tail.
+    this.data = this.data
+                    .set( 'head', new Map() )
+                    .set( 'tail', new Map() )
+
+    // Re-insert the outgoing objects.
+    outgoing.forEach(
+      obj => {
+        let tbl = this.getTable( obj._type, 'tail' )
+        tbl.set( obj )
+        this.saveTable( tbl, 'tail' )
+      }
+    )
+    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
+  }
+
+  /**
    * Load models from JSON API format.
    */
   loadJsonApi( response ) {
-    if( !isIterable( response ) )
-      response = [response];
+    if( !isIterable( response ) ) {
+      response = [response]
+    }
 
-    // Construct our current diffs for later reply.
-    let diffs = this.getDiffs();
+    // Assemble the responses into sets of split objects.
+    let splitObjectsSet = response.map(
+      resp =>
+        splitJsonApiResponse( resp )
+    )
+
+    this.loadSplitObjectsSet( splitObjectsSet )
+  }
+
+  /**
+   * Load a set of objects into the DB.
+   */
+  loadObjects( objects ) {
+    if( !isIterable( objects ) ) {
+      objects = [objects]
+    }
+
+    let splitObjects = {}
+    for( const obj of objects ) {
+      if( !(obj._type in splitObjects) )
+        splitObjects[obj._type] = []
+      splitObjects[obj._type].push( obj )
+    }
+
+    this.loadSplitObjectsSet( splitObjects )
+  }
+
+  loadSplitObjectsSet( splitObjectsSet ) {
+    splitObjectsSet = toList( splitObjectsSet )
+
+    // Construct our current diffs for later replay. These are changes
+    // yet to be committed.
+    let localDiffs = this.getDiffs()
+
+    // Unapply my outgoing diffs to makre sure we don't duplicate
+    // the diffs.
+    for( const diff of this.data.get( 'diffs' ) ) {
+      this.applyDiff( diff, true, 'tail' )
+    }
 
     // Load all reponse objects.
-    for( const resp of response ) {
-      const objects = splitJsonApiResponse( resp );
-
-      /* // Cache the latest redo position. We don't want to revert the
-      // state of the DB too far.
-      const current = this.data.getIn( ['chain', 'current'] ); */
-
-      /* // Walk back the diff chain to get the current data into
-      // server configuration.
-      this.undoAll(); */
+    for( const splitObjects of splitObjectsSet ) {
 
       // Now update the head data state to reflect the new server
       // information.
-      Object.keys( objects ).forEach( type => {
-        let tbl = this.getTable( type, 'tail' );
-        objects[type].map( obj => {
-          tbl.set( obj );
-        });
-        this.saveTable( tbl, 'tail' );
-      });
-
-      /* // Replay all the diffs to bring us back to the correct position.
-      this.goto( current ); */
-
-      /* // Now we need to handle any current transactions. We do it be replacing
-      // the heads, then replaying the diffs.
-      this.data.get( 'transactions' ).forEach( (trans, name) => {
-        trans = this.getTransaction( name );
-        trans.data = trans.data.set( 'head', this.data.get( 'head' ) );
-        let cur = trans.data.getIn( ['chain', 'current'] );
-        trans.data.setIn( ['chain', 'current'], 0 );
-        trans.goto( cur );
-        this.saveTransaction( trans );
-      }); */
+      Object.keys( splitObjects ).forEach( type => {
+        let tbl = this.getTable( type, 'tail' )
+        splitObjects[type].map( obj => {
+          tbl.set( obj )
+        })
+        this.saveTable( tbl, 'tail' )
+      })
     }
 
     // Recalculate reverse-related fields.
-    this._updateReverseRelationships( 'tail' );
+    this._updateReverseRelationships( 'tail' )
 
-    // Replace head with tail.
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) );
-
-    // Replay diffs.
-    for( const diff of diffs )
-      this.applyDiff( diff );
-  }
-
-  loadObjects( objects ) {
-    if( !isIterable( objects ) )
-      objects = [objects];
-
-    let splitObjects = {};
-    for( const obj of objects ) {
-      if( !(obj._type in splitObjects) )
-        splitObjects[obj._type] = [];
-      splitObjects[obj._type].push( obj );
+    // Replay outgoing diffs onto tail. This is to match the expectation
+    // that outgoing diffs will be applied to the server.
+    for( const diff of this.data.get( 'diffs' ) ) {
+      this.applyDiff( diff, false, 'tail' )
     }
 
-    // Construct our current diffs for later reply.
-    let diffs = this.getDiffs();
-
-    // Now update the head data state to reflect the new server
-    // information.
-    Object.keys( splitObjects ).forEach( type => {
-      let tbl = this.getTable( type, 'tail' );
-      splitObjects[type].map( obj => {
-        tbl.set( obj );
-      });
-      this.saveTable( tbl, 'tail' );
-    });
-
-    // Recalculate reverse-related fields.
-    this._updateReverseRelationships( 'tail' );
-
     // Replace head with tail.
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) );
+    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
 
-    // Replay diffs.
-    for( const diff of diffs )
-      this.applyDiff( diff );
+    // Replay local diffs onto head.
+    for( const diff of localDiffs ) {
+      this.applyDiff( diff )
+    }
   }
 
   _updateReverseRelationships( branch='head' ) {
@@ -223,8 +242,9 @@ export default class DB {
 
   getInstance( typeOrQuery, idOrQuery ) {
     const obj = this.get( typeOrQuery, idOrQuery );
-    if( obj === undefined )
-      throw new ModelError( `DB: Failed to find object.` );
+    if( obj === undefined ) {
+      throw new ModelError( `DB: Failed to find object.` )
+    }
     return this.schema.toInstance(
       this.get( typeOrQuery, idOrQuery ),
       this
@@ -347,12 +367,27 @@ export default class DB {
     }
 
     // Add removals.
-    for( const rem of this.data.get( 'removals' ) ) {
-      diffs.push({
-        _type: [rem._type, undefined],
-        id: [rem.id, undefined]
-      });
-    }
+    this.schema.models.map( (model, type) => {
+      const headTbl = this.getTable( model.type, 'head' )
+      const tailTbl = this.getTable( model.type, 'tail' )
+      for( const tailObj of tailTbl.iterObjects() ) {
+        const headObj = headTbl.get( tailObj.id )
+        if( headObj ) {  // ony want removals
+          continue
+        }
+        const diff = model.diff( tailObj, headObj )
+        if( !diff ) {  // can this even happen?
+          continue
+        }
+        diffs.push( diff )
+      }
+    })
+    /* for( const rem of this.data.get( 'removals' ) ) {
+     *   diffs.push({
+     *     _type: [rem._type, undefined],
+     *     id: [rem.id, undefined]
+     *   });
+     * }*/
 
     return diffs;
   }
@@ -483,6 +518,7 @@ export default class DB {
     }
 
     // Store the resulting diffs on top of existing ones.
+    console.debug( `DB: Committing ${newDiffs.length} new diff(s)` )
     this.data = this.data.update( 'diffs', x => x.concat( newDiffs ) );
 
     // Reset tail to head.
@@ -554,7 +590,6 @@ export default class DB {
     let object = this.get( type, id );
     id = this.getId( object );
     const diff = model.diff( object, undefined );
-    /* this.addDiff( diff );*/
     this.applyDiff( diff );
   }
 
@@ -782,6 +817,8 @@ export default class DB {
   postCommitDiff( response, diff ) {
     if( !diff ) {
       diff = this.data.getIn( ['diffs', 0] );
+
+      // Remove the first diff in the chain.
       this.data = this.data.update( 'diffs', x => x.shift() );
     }
 
@@ -918,7 +955,6 @@ export default class DB {
     this.loadJsonApi( trans.data.get( 'loads', [] ) );
     for( const objs of trans.data.get( 'objectLoads', [] ) )
       this.loadObjects( objs );
-    /* this.addBlock( trans.getDiffs() );*/
     const diffs = trans.getDiffs();
     for( const diff of diffs )
       this.applyDiff( diff );

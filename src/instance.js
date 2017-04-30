@@ -79,7 +79,10 @@ export default class Instance {
             return this._values.get( name );
           },
           set: function( x ) {
-            this._values.set( name, this._db.getId( x ) )
+            if( x )
+              this._values = this._values.set( name, this._db.getId( x ) )
+            else
+              this._values = this._values.set( name, x )
           }
         });
       }

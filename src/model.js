@@ -36,8 +36,6 @@ export default class Model {
           return data;
         });
       }
-      else
-        console.error( `Warning: No operation "${key}" on model "${this.type}".` );
     }
   }
 
@@ -138,10 +136,29 @@ export default class Model {
     return !info.get( 'many' );
   }
 
+  fieldIsManyToMany( field ) {
+    const info = this.relationships.get( field )
+    if( info === undefined ) {
+      return false
+    }
+    return info.get( 'many' )
+  }
+
+  fieldIsRelationship( field ) {
+    const info = this.relationships.get( field )
+    if( info === undefined )
+      return false
+    return true
+  }
+
   getField( name ) {
-    if( !this.relationships.has( name ) )
-      throw new ModelError( `Model ${this.type} has no field ${name}.` );
-    return this.relationships.get( name );
+    let field = this.attributes.get( name )
+    if( field === undefined ) {
+      if( !this.relationships.has( name ) )
+        throw new ModelError( `Model ${this.type} has no field ${name}.` )
+      field = this.relationships.get( name )
+    }
+    return field
   }
 
   diff( fromObject, toObject ) {

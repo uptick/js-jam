@@ -4,7 +4,7 @@
 export const makeTinyApiOps = (descr, api) => {
   for( const [model, info] of Object.entries( descr ) ) {
     info.ops = {
-      ...api.crud[info.api.plural]
+      ...api.crud[info.plural]
     }
   }
   return descr

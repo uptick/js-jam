@@ -415,7 +415,7 @@ export function collectJsonApi( response ) {
     let mod = splitModels[obj.type][idx.first()];
     Object.keys( obj.relationships || {} ).map( relName => {
       let rels = obj.relationships[relName].data;
-      let relMods = toArray( rels ).map( relObj => {
+      let relMods = toArray( rels || [] ).map( relObj => {
         return _doObject( relObj );
       });
       relMods = relMods.filter( x => x !== undefined );

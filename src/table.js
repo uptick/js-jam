@@ -288,8 +288,10 @@ class Table {
           diff[x][jj].forEach( y => obj = obj.set( x, obj[x].add( ID( y ) ) ) );
         }
         else {
-          if( obj[x] != diff[x][ii] )
-            throw new ModelError( 'Conflict while applying diff.' );
+          if( obj[x] != diff[x][ii] ) {
+            debugger
+            throw new ModelError( 'Conflict while applying diff.' )
+          }
           obj = obj.set( x, diff[x][jj] )
         }
       });

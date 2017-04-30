@@ -1,11 +1,12 @@
-import {take} from 'redux-saga/effects';
+import {take, actionChannel} from 'redux-saga/effects'
 
 /**
  *
  */
 export function *eachInline( actionType, saga ) {
+  const chan = yield actionChannel( actionType )
   while( true ) {
-    const action = yield take( actionType );
-    yield saga( action.payload );
+    const action = yield take( chan )
+    yield saga( action )
   }
 }

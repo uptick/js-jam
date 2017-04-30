@@ -1,4 +1,4 @@
-import { Schema } from '../src/schema';
+import Schema from '../src/schema'
 
 export const schema = new Schema({
   book: {
@@ -39,7 +39,7 @@ export const schema = new Schema({
       name: {}
     }
   }
-});
+})
 
 export function getJsonApiData() {
   return {
@@ -120,5 +120,5 @@ export function getJsonApiData() {
       },
       relationships: {}
     }]
-  };
+  }
 }

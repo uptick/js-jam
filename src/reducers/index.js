@@ -1,9 +1,8 @@
-import { Map } from 'immutable';
-import { combineReducers } from 'redux';
+import {combineReducers} from 'redux'
 
-import DB from '../db';
-import { createReducer } from './utils';
-import { flattenObject } from '../utils';
+import DB from '../db'
+import {createReducer} from './utils'
+import {flattenObject} from '../utils'
 
 /**
  * Manages the state for models loaded form a server. As an example
@@ -21,13 +20,13 @@ const dbReducer = createReducer( null, {
     return db.data;
   },
 
-  MODEL_ADD_BLOCKS( state, action ) {
-    let db = new DB( state );
-    const {blocks} = action;
-    for( const block of blocks )
-      db.addBlock( block );
-    return db.data;
-  },
+  /* MODEL_ADD_BLOCKS( state, action ) {
+   *   let db = new DB( state );
+   *   const {blocks} = action;
+   *   for( const block of blocks )
+   *     db.addBlock( block );
+   *   return db.data;
+   * },*/
 
   MODEL_LOAD_JSON( state, action ) {
     const {schema, jsonData} = action.payload;
@@ -37,94 +36,75 @@ const dbReducer = createReducer( null, {
     return db.data;
   },
 
-  /* MODEL_SET_DB( state, action ) {
-   *   return action.payload;
+  MODEL_SET_DB_DATA( state, action ) {
+    return action.payload
+  },
+
+  /* MODEL_APPLY_BLOCK( state, action ) {
+   *   let db = new DB( state );
+   *   db.applyBlock( action.payload );
+   *   return db.data;
    * },*/
 
-  MODEL_APPLY_BLOCK( state, action ) {
-    let db = new DB( state );
-    db.applyBlock( action.payload );
-    return db.data;
-  },
+  /* MODEL_COMMIT_DIFF( state, action ) {
+   *   const { diff, response } = action.payload;
+   *   let db = new DB( state );
+   *   db.postCommitDiff( diff, response );
+   *   db.popDiff();
+   *   return {
+   *     ...state,
+   *     db: db.data
+   *   };
+   * },*/
 
-  MODEL_SYNC_REQUEST( state, action ) {
-    return state;
-  },
+  /* MODEL_LOAD_JSON_API_RESPONSE( state, action ) {
+   *   const {schema, data} = action.payload;
+   *   let db = schema.db( state );
+   *   db.loadJsonApiResponse( data );
+   *   return db.data;
+   * },*/
 
-  MODEL_COMMIT_DIFF( state, action ) {
-    const { diff, response } = action.payload;
-    let db = new DB( state );
-    db.postCommitDiff( diff, response );
-    db.popDiff();
-    return {
-      ...state,
-      db: db.data
-    };
-  },
+  /* MODEL_COMMIT( state, action ) {
+   *   const {schema} = action.payload;
+   *   let db = schema.db( state );
+   *   db.commit();
+   *   return db.data;
+   * },*/
 
-  MODEL_LOAD_JSON_API_RESPONSE( state, action ) {
-    const {schema, data} = action.payload;
-    let db = schema.db( state );
-    db.loadJsonApiResponse( data );
-    return db.data;
-  },
+  /* MODEL_POST_COMMIT_DIFF( state, action ) {
+   *   const {response, schema} = action.payload;
+   *   let db = schema.db( state );
+   *   db.postCommitDiff( response );
+   *   return db.data;
+   * },*/
 
-  MODEL_COMMIT( state, action ) {
-    const {schema} = action.payload;
-    let db = schema.db( state );
-    db.commit();
-    return db.data;
-  },
+  /* MODEL_START_TRANSACTION( state, action ) {
+   *   const schema = action.payload.schema;
+   *   let db = new DB( state, {schema} );
+   *   db.startTransaction( action.payload );
+   *   return db.data;
+   * },
 
-  MODEL_POST_COMMIT_DIFF( state, action ) {
-    const {response, schema} = action.payload;
-    let db = schema.db( state );
-    db.postCommitDiff( response );
-    return db.data;
-  },
+   * MODEL_SAVE_TRANSACTION( state, action ) {
+   *   const schema = action.payload.schema;
+   *   let db = new DB( state, {schema} );
+   *   db.saveTransaction( action.payload.db );
+   *   return db.data;
+   * },
 
-  MODEL_SYNC_SUCCESS( state, action ) {
-    const { sync, syncErrors, ...rem } = state;
-//    return rem;
-    return state;
-  },
+   * MODEL_COMMIT_TRANSACTION( state, action ) {
+   *   const schema = action.payload.schema;
+   *   let db = new DB( state, {schema} );
+   *   db.commitTransaction( action.payload.name );
+   *   return db.data;
+   * },
 
-  MODEL_SYNC_FAILURE( state, action ) {
-    const { sync, ...rem } = state;
-    return state;
-    /* return {
-       ...rem,
-       syncErrors: action.payload
-       }; */
-  },
-
-  MODEL_START_TRANSACTION( state, action ) {
-    const schema = action.payload.schema;
-    let db = new DB( state, {schema} );
-    db.startTransaction( action.payload );
-    return db.data;
-  },
-
-  MODEL_SAVE_TRANSACTION( state, action ) {
-    const schema = action.payload.schema;
-    let db = new DB( state, {schema} );
-    db.saveTransaction( action.payload.db );
-    return db.data;
-  },
-
-  MODEL_COMMIT_TRANSACTION( state, action ) {
-    const schema = action.payload.schema;
-    let db = new DB( state, {schema} );
-    db.commitTransaction( action.payload.name );
-    return db.data;
-  },
-
-  MODEL_ABORT_TRANSACTION( state, action ) {
-    const schema = action.payload.schema;
-    let db = new DB( state, {schema} );
-    db.abortTransaction( action.payload.name );
-    return db.data;
-  }
+   * MODEL_ABORT_TRANSACTION( state, action ) {
+   *   const schema = action.payload.schema;
+   *   let db = new DB( state, {schema} );
+   *   db.abortTransaction( action.payload.name );
+   *   return db.data;
+   * }*/
 });
 
 /**
@@ -152,7 +132,7 @@ const viewReducer = createReducer({}, {
     return {
       ...state,
       [name]: {
-        ready: false
+        loading: true
       }
     };
   },
@@ -169,7 +149,7 @@ const viewReducer = createReducer({}, {
       [name]: {
         ...viewState,
         ...results,
-        ready: true
+        loading: false
       }
     };
   },
@@ -184,9 +164,29 @@ const viewReducer = createReducer({}, {
   }
 });
 
+const syncReducer = createReducer(
+  false,
+  {
+
+    MODEL_SYNC_REQUEST( state, action ) {
+      return true
+    },
+
+    MODEL_SYNC_SUCCESS( state, action ) {
+      return false
+    },
+
+    MODEL_SYNC_FAILURE( state, action ) {
+      return false
+    }
+
+  }
+)
+
 const modelReducer = combineReducers({
   db: dbReducer,
-  views: viewReducer
+  views: viewReducer,
+  sync: syncReducer
 });
 
 export default modelReducer;
