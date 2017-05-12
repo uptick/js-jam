@@ -22,7 +22,8 @@ export default (ComposedComponent, options) => {
       const trans = db.getTransaction( name )
       return {
         originalDB: db,
-        db: trans
+        db: trans,
+        sync: model.sync
       }
     },
 
@@ -88,7 +89,7 @@ export default (ComposedComponent, options) => {
 
       sync() {
         const {schema} = options || {}
-        this.props.sync( {schema} )
+        return this.props.sync( {schema} )
       }
 
       commit() {
@@ -99,21 +100,18 @@ export default (ComposedComponent, options) => {
       render() {
         const {db, loading} = this.props
         const {schema, name} = options || {}
-        if( db && !loading ) {
-          return (
-            <ComposedComponent
-              {...this.props}
-              saveTransaction={() => this.props.saveTransaction( {schema, db} )}
-              commitTransaction={this.commitTransaction}
-              abortTransaction={this.abortTransaction}
-              loadJsonApiResponse={data => this.props.loadJsonApiResponse( {schema, data} )}
-              sync={this.sync}
-              commit={this.commit}
-            />
-          )
-        }
-        else
-          return null
+        return (
+          <ComposedComponent
+            {...this.props}
+            loading={!db || loading}
+            saveTransaction={() => this.props.saveTransaction( {schema, db} )}
+            commitTransaction={this.commitTransaction}
+            abortTransaction={this.abortTransaction}
+            loadJsonApiResponse={data => this.props.loadJsonApiResponse( {schema, data} )}
+            sync={this.sync}
+            commit={this.commit}
+          />
+        )
       }
     }
   );

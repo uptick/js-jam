@@ -10,7 +10,7 @@ function capitalize( string ) {
 class ModelForm extends Component {
 
   renderField( fieldName, model ) {
-    const {typeMapping, fieldProps={}, instance={}, onChange, db} = this.props
+    const {typeMapping={}, nameMapping={}, fieldProps={}, instance={}, onChange, db} = this.props
     const field = model.getField( fieldName )
     let type, value = instance[fieldName]
     const isFK = model.fieldIsForeignKey( fieldName )
@@ -23,29 +23,33 @@ class ModelForm extends Component {
     else {
       type = field.get( 'type' )
     }
-    const cls = typeMapping[type]
+    const cls = nameMapping[fieldName] || typeMapping[type]
     if( cls === undefined )
       throw new Error( `no ModelForm field mapping for type ${type}` )
-    const props = fieldProps[fieldName] || {}
+    let props = {
+      default: field.get( 'default' ),
+      name: fieldName,
+      label: capitalize( field.get( 'label' ) ),
+      value,
+      onChange: x => {
+        if( isFK && x ) {
+          db.loadObjects( x )
+        }
+        instance[fieldName] = x
+        instance.save()
+        if( onChange )
+          onChange()
+      },
+      key: fieldName,
+      ...(fieldProps[fieldName] || {})
+    }
+    if( field.get( 'choices', undefined ) ) {
+      props.options = field.get( 'choices' ).toJS()
+      props.options = Object.keys( props.options ).map( v => ({value: v, label: props.options[v]}) )
+    }
     return React.createElement(
       cls,
-      {
-        default: field.get( 'default' ),
-        name: fieldName,
-        label: capitalize( field.get( 'label' ) ),
-        value,
-        onChange: x => {
-          if( isFK && x ) {
-            db.loadObjects( x )
-          }
-          instance[fieldName] = x
-          instance.save()
-          if( onChange )
-            onChange()
-        },
-        key: fieldName,
-        ...props
-      }
+      props
     )
   }
 

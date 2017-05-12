@@ -1,5 +1,4 @@
 import { List, Map, Set, Record } from 'immutable';
-import uuid from 'uuid';
 
 export function isIterable( x ) {
   if( x === null )

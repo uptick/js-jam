@@ -958,7 +958,11 @@ export default class DB {
     const diffs = trans.getDiffs();
     for( const diff of diffs )
       this.applyDiff( diff );
-    this.abortTransaction( trans.name );
+
+    // TODO: Don't abort the transaction as it causes transcation-components
+    // to create a new transaction. Instead, keep it around. The TODO is because
+    // we may need to undo this later.
+    /* this.abortTransaction( trans.name );*/
   }
 
   abortTransaction( trans ) {

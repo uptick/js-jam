@@ -1,6 +1,5 @@
 import { List, Map, Set, fromJS, Record } from 'immutable';
 import { ModelError } from './utils';
-import uuid from 'uuid';
 
 import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils';
 
@@ -202,7 +201,7 @@ class Table {
   reId( oldId, newId ) {
     const index = this._getIndex( oldId );
     this.data = this.data
-                    .deleteIn( ['indices', this.idField, oldId] )
+    /* .deleteIn( ['indices', this.idField, oldId] )*/
                     .setIn( ['indices', this.idField, newId], new Set( [index] ) )
                     .setIn( ['objects', index, this.idField], newId );
   }

@@ -1,5 +1,4 @@
 import { OrderedSet, Set, Record, fromJS } from 'immutable';
-import uuid from 'uuid';
 
 import Instance from './instance';
 import { getDiffOp, toArray, ModelError } from './utils';
