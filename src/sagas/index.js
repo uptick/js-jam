@@ -237,8 +237,12 @@ function* loadJson( payload ) {
     mutate,
     payload.schema,
     db => {
-      for( const data of payload.jsonData )
+      for( const data of payload.jsonData ) {
+
+        // TODO: For some reason exceptions don't get propagated
+        // from within this call. No idea why...
         db.loadJsonApi( data )
+      }
     }
   )
   yield put( {type: 'MODEL_LOAD_JSON_DONE', payload} )

@@ -8,12 +8,12 @@ import DB from '../db'
 /**
  *
  */
-export default (ComposedComponent, options) => {
+export default (options) => {
 
   /**
    * Connect the wrapper component to the model state.
    */
-  return connect(
+  return ComposedComponent => connect(
 
     state => {
       const {name, schema} = options || {}
