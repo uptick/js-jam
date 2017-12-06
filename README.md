@@ -6,7 +6,7 @@ easier and more powerful.
 ## Installation
 
 ```bash
-npm install redux-jam`
+npm install redux-jam
 ```
 
 or
@@ -56,7 +56,7 @@ schema.merge({})
 `merge` may be called any number of times. Each subsequent call will overwrite
 any overlapping models.
 
-The sructure of the schema object is similar in some ways to the structure of
+The structure of the schema object is similar in some ways to the structure of
 a JSON-API object. Take for example the following definition of a movie:
 
 ```js
@@ -104,7 +104,7 @@ This defines two models: `movie` and `person`. The `api` sections of each
 model are placeholders for calls to API endpoints. They should return promises,
 which in turn return JSON-API structured data.
 
-Options for atrributes are currently limited to `required`.
+Options for attributes are currently limited to `required`.
 
 Options for relationships:
 
@@ -119,9 +119,9 @@ Options for relationships:
 ### Django + DRF
 
 If you're using Django and DRF, your schema can be loaded into JAM
-automatically, which is particularly convenient. TODO: Include a link to
-djano-jam once it's up.
+automatically, which is particularly convenient.
 
+Refer to [Django-JAM](https://github.com/ABASystems/django-jam)
 
 ## Loading Data
 
