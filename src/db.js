@@ -19,10 +19,13 @@ export default class DB {
   constructor( data, options={} ) {
     this.schema = options.schema;
     if( data ) {
-      if( Map.isMap( data ) )
+      if( Map.isMap( data ) ) {
         this.data = data;
-      else
-        throw new ModelError( 'Unknown data given to DB constructor.' );
+      }
+      else {
+        let msg = `Unknown data given to DB constructor: "${data}"`
+        throw new ModelError( msg );
+      }
     }
     else
       this.reset();
@@ -184,7 +187,15 @@ export default class DB {
             return;
 
           for( const rel of tbl.iterRelated( obj.id, field ) ) {
-            let relTbl = this.getTable( rel._type, branch );
+            let relTbl
+            try {
+              relTbl = this.getTable( rel._type, branch );
+            }
+            catch( e ) {
+              console.warn( `Unable to find related type: ${rel._type}` )
+              continue
+            }
+
             const relName = relInfo.get( 'relatedName' );
             if( relName ) {
               const relObj = relTbl.get( rel.id );

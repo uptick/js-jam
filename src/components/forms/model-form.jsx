@@ -24,8 +24,11 @@ class ModelForm extends Component {
       type = field.get( 'type' )
     }
     const cls = nameMapping[fieldName] || typeMapping[type]
-    if( cls === undefined )
-      throw new Error( `no ModelForm field mapping for type ${type}` )
+    if( cls === undefined ) {
+      let msg = `no ModelForm field mapping for type ${type}`
+      console.warn(msg)
+      return null
+    }
     let props = {
       default: field.get( 'default' ),
       name: fieldName,

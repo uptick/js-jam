@@ -39,9 +39,12 @@ function* loadModelView( action ) {
         results[name] = null
     }
 
-    // Clear the database prior to loading data. We don't need to
-    // wait for it because we'll be waiting for the next put.
-    yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
+    // TODO: I don't think I need this. Clearing can be nice to keep things
+    // clean, but it precludes the possibility of having different components
+    // use DBComponent.
+    // // Clear the database prior to loading data. We don't need to
+    // // wait for it because we'll be waiting for the next put.
+    // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
 
     // Merge in the loaded data and wait for it to be finished.
     yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
@@ -237,8 +240,12 @@ function* loadJson( payload ) {
     mutate,
     payload.schema,
     db => {
-      for( const data of payload.jsonData )
+      for( const data of payload.jsonData ) {
+
+        // TODO: For some reason exceptions don't get propagated
+        // from within this call. No idea why...
         db.loadJsonApi( data )
+      }
     }
   )
   yield put( {type: 'MODEL_LOAD_JSON_DONE', payload} )
@@ -299,7 +306,7 @@ export function* mutationSerializer( action ) {
  */
 export default function* modelSaga() {
   yield [
-    takeLatest( 'MODEL_LOAD_VIEW', loadModelView ),
+    eachInline( 'MODEL_LOAD_VIEW', loadModelView ),
     eachInline( 'MODEL_SYNC', sync ),
     eachInline(
       [

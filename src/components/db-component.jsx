@@ -9,12 +9,12 @@ import DB from '../db';
  * Higher-order component to automatically insert models loaded
  * from a server.
  */
-export default (ComposedComponent, options) => {
+export default (options) => {
 
   /**
    * Connect the wrapper component to the model state.
    */
-  return connect(
+  return ComposedComponent => connect(
 
     state => {
       const {name, schema} = options || {};

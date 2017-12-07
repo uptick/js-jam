@@ -83,9 +83,9 @@ const dbReducer = createReducer( null, {
    *   let db = new DB( state, {schema} );
    *   db.startTransaction( action.payload );
    *   return db.data;
-   * },
+   * },*/
 
-   * MODEL_SAVE_TRANSACTION( state, action ) {
+  /* MODEL_SAVE_TRANSACTION( state, action ) {
    *   const schema = action.payload.schema;
    *   let db = new DB( state, {schema} );
    *   db.saveTransaction( action.payload.db );

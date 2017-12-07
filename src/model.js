@@ -82,8 +82,9 @@ export default class Model {
           val.map( x => db.makeId( x ) )
         ));
       }
-      else if( obj[name] )
+      else if( obj[name] ) {
         obj = obj.set( name, db.makeId( obj[name] ) );
+      }
     });
     return obj;
   }

@@ -1,6 +1,6 @@
 {
   "name": "redux-jam",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "A Redux JSON-API model layer.",
   "repository": {
     "type": "git",
@@ -14,7 +14,7 @@
     "watch:prod": "webpack --config webpack/webpack.config.production.js --progress --colors --watch",
     "dev": "node server.js",
     "test": "mocha --require mock-css-modules --require babel-polyfill --compilers js:babel-register -R nyan --recursive tests/*.js",
-    "prepublish": "npm run build:prod"
+    "prepublish": "webpack --config webpack/webpack.config.production.js --progress --colors"
   },
   "author": "Luke Hodkinson",
   "license": "ISC",
