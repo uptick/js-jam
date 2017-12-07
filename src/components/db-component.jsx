@@ -34,29 +34,6 @@ export default (options) => {
         loading,
         db
       }
-
-      // Check meta for pagination across our results. Any result list that
-      // has pagination attached should use a PaginatedArray instead, to allow
-      // easier interactions.
-      /* Object.keys( rest ).forEach(
-       *   name => {
-       *     const { pagination, links } = meta[name] || {}
-       *     if( pagination && links ) {
-       *       console.debug( `DBComponent: Using pagination for ${name}` )
-       *       let pa = new PaginatedArray( ...rest[name] )
-       *       pa.view = name
-       *       pa.page = pagination.offset
-       *       pa.pageSize = pagination.limit
-       *       pa.numPages = pagination.count
-       *       pa.links = links
-       *       results[name] = pa
-       *     }
-       *     else {*/
-      // results[name] = rest[name]
-      /* }
-         }
-         )*/
-
       return results
     },
 
