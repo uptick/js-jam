@@ -6,18 +6,25 @@ import {makeId, getDiffId} from '../utils'
 import DB from '../db'
 import {eachInline} from './utils'
 
+import { changePage } from './pagination'
+
 let mutateIndex = 0
 
 function* loadModelView( action ) {
   try {
-    const {schema, name, query, props} = action.payload
-    yield put( {type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name}} )
+    const { schema, name, query, props } = action.payload
+    yield put( { type: 'MODEL_LOAD_VIEW_REQUEST', payload: { name } } )
 
+    // Load the DB from the state.
     const state = yield select()
     let db = schema.db( state.model.db )
 
     // A place to put the IDs of our loaded objects.
     let results = {}
+
+    // A place to store extra data about our results.
+    // TODO: This should probably live in the data itself? Maybe?
+    let meta = {}
 
     // A place to hold the JSON responses to be loaded.
     let jsonData = []
@@ -27,13 +34,26 @@ function* loadModelView( action ) {
     for( const name of Object.keys( query ) ) {
       console.debug( `loadModelView: Looking up ${name}.` )
       const data = yield call( query[name], props )
-      if( data !== null )
+      if( data !== null ) {
         jsonData.push( data )
+      }
       if( data ) {
-        if( Array.isArray( data.data ) )
+        if( Array.isArray( data.data ) ) {
+
+          // First, convert the results into an array of IDs.
           results[name] = data.data.map( x => makeId( x.type, x.id ) )
-        else
+
+          // Store any links and pagination information.
+          meta[name] = {
+            ...(data.meta || {})
+          }
+          if( data.links ) {
+            meta[name].links = data.links
+          }
+        }
+        else {
           results[name] = makeId( data.data.type, data.data.id )
+        }
       }
       else
         results[name] = null
@@ -58,57 +78,13 @@ function* loadModelView( action ) {
       }
     )
 
-    yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results}} )
+    yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta}} )
   }
   catch( e ) {
     console.error( e )
     yield put( {type: 'MODEL_LOAD_VIEW_FAILURE', errors: e.message} )
   }
 }
-
-/* function reIdDiff( db, diff, id, newId ) {
- *   const fromId = db.getId( diff._type[0], id );
- *   const toId = db.getId( diff._type[0], newId );
- *   console.log( 'fromId: ', fromId.toJS() );
- *   console.log( 'toId: ', toId.toJS() );
- *   console.log( 'diff: ', diff );
- *   let newDiff = {
- *     ...diff
- *   };
- *   if( diff.id[0] == id ) {
- *     newDiff.id[0] = newId;
- *   }
- *   if( diff.id[1] == id ) {
- *     newDiff.id[1] = newId;
- *   }
- *   const relModel = db.getModel( getDiffId( diff )._type );
- *   for( const field of relModel.iterForeignKeys() ) {
- *     if( diff[field] ) {
- *       newDiff[field] = [diff[field][0], diff[field][1]];
- *       if( diff[field][0] && diff[field][0].equals( fromId ) ) {
- *         newDiff[field][0] = toId;
- *       }
- *       if( diff[field][1] && diff[field][1].equals( fromId ) ) {
- *         newDiff[field][1] = toId;
- *       }
- *     }
- *   }
- *   for( const field of relModel.iterManyToMany() ) {
- *     if( diff[field] ) {
- *       newDiff[field] = [diff[field][0], diff[field][1]];
- *       if( newDiff[field][0] && newDiff[field][0].has( fromId ) ) {
- *         newDiff[field][0] = newDiff[field][0].delete( fromId ).add( toId );
- *       }
- *       console.log( newDiff[field][1].toJS() );
- *       console.log( fromId.toJS() );
- *       console.log( newDiff[field][1].has( fromId ) );
- *       if( newDiff[field][1] && newDiff[field][1].has( fromId ) ) {
- *         newDiff[field][1] = newDiff[field][1].delete( fromId ).add( toId );
- *       }
- *     }
- *   }
- *   return newDiff;
- * }*/
 
 /**
  * Synchronise the current DB against the server.
@@ -307,6 +283,15 @@ export function* mutationSerializer( action ) {
 export default function* modelSaga() {
   yield [
     eachInline( 'MODEL_LOAD_VIEW', loadModelView ),
+    eachInline(
+      [
+        'MODEL_NEXT_PAGE',
+        'MODEL_PREV_PAGE',
+        'MODEL_FIRST_PAGE',
+        'MODEL_LAST_PAGE'
+      ],
+      changePage
+    ),
     eachInline( 'MODEL_SYNC', sync ),
     eachInline(
       [

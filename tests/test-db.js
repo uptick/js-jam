@@ -344,15 +344,14 @@ describe( 'DB', function() {
   describe( 'reId', function() {
 
     it( 'works', function() {
-      let db = new DB( null, {schema} );
-      db.loadJsonApi( getJsonApiData() );
-      db.reId( 'book', 2, 20 );
-      assert.deepEqual( db.get( 'book', 2 ), undefined );
-      assert.deepEqual( db.get( 'book', 20 ).id, 20 );
-      assert.deepEqual( db.get( 'author', 2 ).books.has( makeId( 'book', 2 ) ), false );
-      assert.deepEqual( db.get( 'author', 2 ).books.has( makeId( 'book', 20 ) ), true );
-      assert.deepEqual( db.get( 'author', 3 ).books.has( makeId( 'book', 2 ) ), false );
-      assert.deepEqual( db.get( 'author', 3 ).books.has( makeId( 'book', 20 ) ), true );
+      let db = new DB( null, {schema} )
+      db.loadJsonApi( getJsonApiData() )
+      db.reId( 'book', 2, 20 )
+      assert.deepEqual( db.get( 'book', 20 ).id, 20 )
+      assert.deepEqual( db.get( 'author', 2 ).books.has( makeId( 'book', 2 ) ), false )
+      assert.deepEqual( db.get( 'author', 2 ).books.has( makeId( 'book', 20 ) ), true )
+      assert.deepEqual( db.get( 'author', 3 ).books.has( makeId( 'book', 2 ) ), false )
+      assert.deepEqual( db.get( 'author', 3 ).books.has( makeId( 'book', 20 ) ), true )
     });
 
     it( 'works with many-to-many diffs', function() {
@@ -361,7 +360,6 @@ describe( 'DB', function() {
       db.update( makeId( 'author', 2 ), {name: 'Buster'} );
       db.update( makeId( 'book', 1 ), {author: db.get( 'book', 1 ).author.add( makeId( 'author', 2 ) )} );
       db.reId( 'author', 2, 20 );
-      assert.deepEqual( db.get( 'author', 2 ), undefined );
       assert.deepEqual( db.get( 'author', 20 ).id, 20 );
       /* assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).author[1].has( makeId( 'author', 2 ) ), false );
        * assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).author[1].has( makeId( 'author', 20 ) ), true );*/
@@ -374,7 +372,6 @@ describe( 'DB', function() {
       const otherId = db.create( {_type: 'book', title: 'Testing', next: id} );
       assert.deepEqual( db.get( 'book', otherId.id ).next.equals( id ), true );
       db.reId( 'book', id.id, 20, 'head' );
-      assert.deepEqual( db.get( 'book', id.id ), undefined );
       assert.deepEqual( db.get( 'book', 20 ).id, 20 );
       assert.deepEqual( db.get( 'book', otherId.id ).next.equals( makeId( 'book', 20 ) ), true );
       /* assert.equal( db.data.getIn( ['chain', 'diffs', 1] ).next[1].equals( makeId( 'book', 20 ) ), true );*/
@@ -396,7 +393,6 @@ describe( 'DB', function() {
       db.commitDiff( diffs[0] )
         .then( response => {
           db.postCommitDiff( response, diffs[0] );
-          assert.equal( db.get( id ), undefined );
           assert.equal( db.get( 'book', 100 ).id, 100 );
           assert.equal( db.get( 'book', 100 ).title, 'Testing' );
           /* assert.equal( db.data.getIn( ['chain', 'diffs', 0] ).id[1], 100 );
