@@ -245,6 +245,7 @@ export default class DB {
     if( obj === undefined ) {
       throw new ModelError( `DB: Failed to find object.` )
     }
+    // TODO: Should be using `obj` from above here or what?!
     return this.schema.toInstance(
       this.get( typeOrQuery, idOrQuery ),
       this

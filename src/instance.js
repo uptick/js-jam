@@ -72,11 +72,23 @@ export default class Instance {
         });
       }
       else {
-        if( data[name] !== undefined )
+
+        // Set the initial value if it exists.
+        if( data[name] !== undefined ) {
           this._initial = this._initial.set( name, data[name] );
+        }
+
+        // The getter for foriegn-keys will return an Instance object
+        // if one exists, and undefined otherwise.
         Object.defineProperty( this, name, {
           get: function() {
-            return this._values.get( name );
+
+            // TODO: Use db.get once I've converted it.
+            let obj = this._db.get( this._values.get( name ) )
+            if( obj ) {
+              obj = this._db.schema.toInstance( obj, this._db )
+            }
+            return obj
           },
           set: function( x ) {
             if( x )
