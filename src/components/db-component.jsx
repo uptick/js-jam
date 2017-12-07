@@ -1,9 +1,10 @@
-import React, {Component} from 'react';
-import {bindActionCreators} from 'redux';
-import {connect} from 'react-redux';
+import React, { Component } from 'react'
+import { bindActionCreators } from 'redux'
+import { connect } from 'react-redux'
 
-import * as modelActions from '../actions';
-import DB from '../db';
+import * as modelActions from '../actions'
+import DB from '../db'
+import PaginatedArray from '../paginated-array'
 
 /**
  * Higher-order component to automatically insert models loaded
@@ -17,21 +18,23 @@ export default (options) => {
   return ComposedComponent => connect(
 
     state => {
-      const {name, schema} = options || {};
-      const {model = {}} = state;
-      const {views = {}} = model;
-      const db = new DB( model.db, {schema} );
-      const content = views[name] || {};
+      const { name, schema } = options || {}
+      const { model = {} } = state
+      const { views = {} } = model
+      const db = new DB( model.db, { schema } )
+      const content = views[name] || {}
 
       // Default to loading to catch that little moment before we've sent off
       // the first REQUEST action.
-      const {loading=true, ...rest} = content
+      const { loading = true, meta = {}, ...rest } = content
 
-      return {
+      // Start constructing the results.
+      let results = {
         ...rest,
         loading,
         db
-      };
+      }
+      return results
     },
 
     dispatch => bindActionCreators( modelActions, dispatch )

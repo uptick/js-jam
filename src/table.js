@@ -1,16 +1,19 @@
-import { List, Map, Set, fromJS, Record } from 'immutable';
-import { ModelError } from './utils';
+import { List, Map, Set, fromJS, Record } from 'immutable'
+import { ModelError } from './utils'
 
-import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils';
+import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils'
 
+/**
+ * Represents data of a particular type.
+ */
 class Table {
 
   /**
    * `data` can be one of: a list of objects, a pre-constructed immutable
    * map containing table data, or undefined.
    */
-  constructor( type, options={} ) {
-    let {data, db, idField='id', indices} = options;
+  constructor( type, options = {} ) {
+    let { data, db, idField='id', indices } = options
     this.type = type;
     this.db = db;
     this.model = db.getModel( type, true );
@@ -108,7 +111,7 @@ class Table {
 
   set( object ) {
 
-    // Must be a better way to convert to a record...
+    // TODO: Must be a better way to convert to a record...
     try {
       object.get( 'id' );
     }
@@ -120,8 +123,9 @@ class Table {
     // worry about adding all the indices, we'll put them in at the
     // end.
     const id = object[this.idField];
-    if( id === undefined )
+    if( id === undefined ) {
       throw ModelError( 'No ID given for table set.' );
+    }
     const existing = this.get( {[this.idField]: id} );
     if( !existing ) {
       const size = this.data.get( 'objects' ).size;
@@ -130,6 +134,11 @@ class Table {
                       .setIn( ['indices', this.idField, id], new Set( [size] ) );
     }
     else {
+
+      // Don't stomp on the existing object's ID. After a reID has been run
+      // we keep around the old ID reference. Occasionally, an object may be
+      // updated using the old ID, so we need to ensure we don't stomp it.
+      object = object.set( 'id', existing.id )
 
       // Eliminate the object's index from current indices and set the
       // new object.
@@ -206,6 +215,10 @@ class Table {
                     .setIn( ['objects', index, this.idField], newId );
   }
 
+  /**
+   * Call a function for each related object.
+   * TODO: Should use "iterRelated"?
+   */
   forEachRelatedObject( id, callback ) {
     const obj = this.get( id );
     const model = this.model;
@@ -231,22 +244,35 @@ class Table {
     this.data = this.data.updateIn( ['objects', index, field], x => x.delete( ID( related ) ) );
   }
 
+  /**
+   * Iterate over all objects in table.
+   */
   *iterObjects() {
     for( const obj of this.data.get( 'objects' ) ) {
-      if( !isEmpty( obj ) )
-        yield obj;
+
+      // Need to check if empty due to the way deletes work (they
+      // temporarily store an empty entry in the table).
+      if( !isEmpty( obj ) ) {
+        yield obj
+      }
     }
   }
 
+  /**
+   * Iterate over related object(s) for object's field.
+   */
   *iterRelated( id, field ) {
-    const obj = this.get( id );
+    const obj = this.get( id )
     if( obj ) {
-      if( this.model.relationships.getIn( [field, 'many'] ) ) {
-        for( const rel of obj[field] )
-          yield rel;
+      const many = this.model.relationships.getIn( [field, 'many'] )
+      if( many ) {
+        for( const rel of obj[field] ) {
+          yield rel
+        }
       }
-      else if( obj[field] )
-        yield obj[field];
+      else if( obj[field] ) {
+        yield obj[field]
+      }
     }
   }
 

@@ -846,6 +846,15 @@ export default class DB {
     this.data = this.data.updateIn( ['chain', 'server'], x => x + 1 );
   }
 
+  /**
+   * Change the ID of an object.
+   *
+   * This is actually a great big jerk. We need to lookup all references
+   * to this object across *everything* and change the identifier.
+   *
+   * NOTE: We can't remove the old ID straight away, as there are cases
+   *       where other components still need to reference it.
+   */
   reId( type, id, newId, branch ) {
     console.debug( `DB: reId: New ID for ${type}, ${id}: ${newId}` );
 
@@ -933,8 +942,9 @@ export default class DB {
   }
 
   startTransaction( name ) {
-    if( this.data.hasIn( ['transactions', name] ) )
-      throw ModelError( `Duplicate transaction: ${name}` );
+    if( this.data.hasIn( ['transactions', name] ) ) {
+      throw new ModelError( `Duplicate transaction: ${name}` );
+    }
     const data = this.data.merge({
 
       // Replace the transaction tail with our current head. This
@@ -962,16 +972,19 @@ export default class DB {
   }
 
   commitTransaction( trans ) {
-    if( typeof trans == 'string' )
-      trans = this.getTransaction( trans );
-    this.loadJsonApi( trans.data.get( 'loads', [] ) );
-    for( const objs of trans.data.get( 'objectLoads', [] ) )
-      this.loadObjects( objs );
-    const diffs = trans.getDiffs();
-    for( const diff of diffs )
-      this.applyDiff( diff );
+    if( typeof trans == 'string' ) {
+      trans = this.getTransaction( trans )
+    }
+    this.loadJsonApi( trans.data.get( 'loads', [] ) )
+    for( const objs of trans.data.get( 'objectLoads', [] ) ) {
+      this.loadObjects( objs )
+    }
+    const diffs = trans.getDiffs()
+    for( const diff of diffs ) {
+      this.applyDiff( diff )
+    }
 
-    // TODO: Don't abort the transaction as it causes transcation-components
+    // TODO: Don't abort the transaction as it causes transaction-components
     // to create a new transaction. Instead, keep it around. The TODO is because
     // we may need to undo this later.
     /* this.abortTransaction( trans.name );*/

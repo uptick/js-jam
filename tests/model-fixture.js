@@ -41,8 +41,8 @@ export const schema = new Schema({
   }
 })
 
-export function getJsonApiData() {
-  return {
+export function getJsonApiData( opts = {} ) {
+  let results = {
     data: [{
       id: 1,
       type: 'book',
@@ -121,4 +121,22 @@ export function getJsonApiData() {
       relationships: {}
     }]
   }
+
+  if( opts.pagination ) {
+    results.meta = {
+      pagination: {
+        limit: 50,
+        offset: 0,
+        count: 100
+      }
+    }
+    results.links = {
+      first: 'first',
+      last: 'last',
+      next: 'next',
+      prev: 'prev'
+    }
+  }
+
+  return results
 }

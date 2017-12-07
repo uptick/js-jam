@@ -91,12 +91,12 @@ describe( 'load with outgoing', function() {
     db.commit()
 
     // Modify another movie but don't commit.
-    trans = db.startTransaction( 'test' )
+    trans = db.startTransaction( 'test2' )
     obj = trans.getInstance( 'movie', 1 )
     obj.title = 'Rocky 3'
     obj.save()
     db.saveTransaction( trans )
-    db.commitTransaction( 'test' )
+    db.commitTransaction( 'test2' )
 
     assert.equal(
       db.data.get( 'diffs' ).toJS()[0].title[1],

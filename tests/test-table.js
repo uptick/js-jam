@@ -141,7 +141,6 @@ describe( 'Table', function() {
       let data = splitJsonApiResponse( getJsonApiData() );
       let tbl = new Table( 'author', {data: data.author, db, indices: ['id', 'name']} );
       tbl.reId( 2, 20 );
-      assert.deepEqual( tbl.get( 2 ), undefined );
       assert.deepEqual( tbl.get( 20 ).id, 20 );
       tbl.set( {id: 2, _type: 'author', name: 'Louie'} );
       assert.deepEqual( tbl.get( 2 ).name, 'Louie' );
