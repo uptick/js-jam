@@ -1,6 +1,6 @@
 {
   "name": "redux-jam",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A Redux JSON-API model layer.",
   "repository": {
     "type": "git",
