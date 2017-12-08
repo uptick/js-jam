@@ -13,11 +13,11 @@ class Table {
    * map containing table data, or undefined.
    */
   constructor( type, options = {} ) {
-    let { data, db, idField='id', indices } = options
-    this.type = type;
-    this.db = db;
-    this.model = db.getModel( type, true );
-    this.idField = idField;
+    let { data, db, idField = 'id', indices } = options
+    this.type = type
+    this.db = db
+    this.model = db.getModel( type, true )
+    this.idField = idField
 
     // Figure out what my indices are.
     this.indices = new Set( indices || this.model.indices || ['id'] );

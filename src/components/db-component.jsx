@@ -4,7 +4,6 @@ import { connect } from 'react-redux'
 
 import * as modelActions from '../actions'
 import DB from '../db'
-import PaginatedArray from '../paginated-array'
 
 /**
  * Higher-order component to automatically insert models loaded

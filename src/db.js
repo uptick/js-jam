@@ -148,7 +148,18 @@ export default class DB {
       // Now update the head data state to reflect the new server
       // information.
       Object.keys( splitObjects ).forEach( type => {
-        let tbl = this.getTable( type, 'tail' )
+
+        // Skip any tables we don't have a model type for.
+        let tbl
+        try {
+          tbl = this.getTable( type, 'tail' )
+        }
+        catch( e ) {
+          // TODO: Catch specific type for missing model.
+          console.warn( e )
+          return;
+        }
+
         splitObjects[type].map( obj => {
           tbl.set( obj )
         })
@@ -174,7 +185,7 @@ export default class DB {
     }
   }
 
-  _updateReverseRelationships( branch='head' ) {
+  _updateReverseRelationships( branch = 'head' ) {
     this.data.get( branch ).forEach( (tblData, type) => {
       let tbl = this.getTable( type, branch );
       tbl.model.relationships.forEach( (relInfo, field) => {
@@ -192,7 +203,7 @@ export default class DB {
               relTbl = this.getTable( rel._type, branch );
             }
             catch( e ) {
-              console.warn( `Unable to find related type: ${rel._type}` )
+              console.warn( `Unable to find related type "${rel._type}", from "${tbl.type}.${field}"` )
               continue
             }
 
@@ -230,8 +241,8 @@ export default class DB {
     return res;
   }
 
-  getModel( type, fail=false ) {
-    return this.schema.getModel( type, fail );
+  getModel( type, fail = false ) {
+    return this.schema.getModel( type, fail )
   }
 
   getTable( type, branch='head' ) {
@@ -252,7 +263,18 @@ export default class DB {
   }
 
   getInstance( typeOrQuery, idOrQuery ) {
-    const obj = this.get( typeOrQuery, idOrQuery );
+
+    // Don't flip out if the model doesn't exist.
+    let obj
+    try {
+      obj = this.get( typeOrQuery, idOrQuery );
+    }
+    catch( e ) {
+      // TODO: Catch specific error.
+      console.warn( e );
+      return undefined
+    }
+
     if( obj === undefined ) {
       throw new ModelError( `DB: Failed to find object.` )
     }

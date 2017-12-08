@@ -43,12 +43,12 @@ export default class Schema {
     return new DB( data, {schema: this} );
   }
 
-  getModel( type, fail=false ) {
-    let model = this.models.get( type );
+  getModel( type, fail = false ) {
+    let model = this.models.get( type )
     if( fail && model === undefined ) {
       throw new ModelError( `Unknown model type: ${type}` )
     }
-    return model;
+    return model
   }
 
   toInstance( data, db ) {

@@ -42,13 +42,13 @@ export default class Model {
     let data = {
       _type: undefined,
       [this.idField]: undefined
-    };
+    }
     this.attributes.forEach( (attr, name) => {
       data[name] = attr.get( 'default' );
-    });
+    })
     this.relationships.forEach( (rel, name) => {
       data[name] = rel.get( 'many' ) ? new OrderedSet() : undefined;
-    });
+    })
     this._record = Record( data );
   }
 

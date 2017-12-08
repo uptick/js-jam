@@ -281,30 +281,36 @@ export function* mutationSerializer( action ) {
  * The composed model saga
  */
 export default function* modelSaga() {
-  yield [
-    eachInline( 'MODEL_LOAD_VIEW', loadModelView ),
-    eachInline(
-      [
-        'MODEL_NEXT_PAGE',
-        'MODEL_PREV_PAGE',
-        'MODEL_FIRST_PAGE',
-        'MODEL_LAST_PAGE'
-      ],
-      changePage
-    ),
-    eachInline( 'MODEL_SYNC', sync ),
-    eachInline(
-      [
-        'MODEL_START_TRANSACTION',
-        'MODEL_SAVE_TRANSACTION',
-        'MODEL_ABORT_TRANSACTION',
-        'MODEL_COMMIT_TRANSACTION',
-        'MODEL_COMMIT',
-        'MODEL_POST_COMMIT_DIFF',
-        'MODEL_LOAD_JSON',
-        'MODEL_CLEAR'
-      ],
-      mutationSerializer
-    )
-  ]
+  try {
+    yield [
+      eachInline( 'MODEL_LOAD_VIEW', loadModelView ),
+      eachInline(
+        [
+          'MODEL_NEXT_PAGE',
+          'MODEL_PREV_PAGE',
+          'MODEL_FIRST_PAGE',
+          'MODEL_LAST_PAGE'
+        ],
+        changePage
+      ),
+      eachInline( 'MODEL_SYNC', sync ),
+      eachInline(
+        [
+          'MODEL_START_TRANSACTION',
+          'MODEL_SAVE_TRANSACTION',
+          'MODEL_ABORT_TRANSACTION',
+          'MODEL_COMMIT_TRANSACTION',
+          'MODEL_COMMIT',
+          'MODEL_POST_COMMIT_DIFF',
+          'MODEL_LOAD_JSON',
+          'MODEL_CLEAR'
+        ],
+        mutationSerializer
+      )
+    ]
+  }
+  catch( e ) {
+    console.error( 'Uncaught exception in redux-jam:' )
+    console.error( e )
+  }
 }
