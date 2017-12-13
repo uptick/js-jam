@@ -16,7 +16,7 @@ export default (options) => {
    */
   return ComposedComponent => connect(
 
-    state => {
+    (state, props) => {
       const { name, schema } = options || {}
       const { model = {} } = state
       const { views = {} } = model
@@ -25,12 +25,22 @@ export default (options) => {
 
       // Default to loading to catch that little moment before we've sent off
       // the first REQUEST action.
-      const { loading = true, meta = {}, ...rest } = content
+      const { meta = {}, ...rest } = content
 
-      // Start constructing the results.
+      // Examine the `loading` value from our props, as it will influence
+      // our loading behavior.
+      let { loading = true } = content
+      if( props.loading ) {
+        loading = true
+      }
+
+      // Start constructing the results. `delayLoad` is set by passing
+      // in `loading` as true into our props. It indicates that any load
+      // requests that come in should be ignored until `loading` is false.
       let results = {
         ...rest,
         loading,
+        delayLoad: props.loading,
         db
       }
       return results
@@ -42,27 +52,28 @@ export default (options) => {
 
     class DBComponent extends Component {
 
-      constructor( props ) {
-        super( props );
-        this.reload = ::this.reload;
-      }
-
       reload( props ) {
-        console.debug( 'DBComponent: Loading.' );
-        props.loadModelView( {...options, props} );
+
+        // Only trigger a reload if we've not received `loading` as
+        // true in our props.
+        if( !props.delayLoad ) {
+          console.debug( 'DBComponent: Loading.' )
+          props.loadModelView( {...options, props} )
+        }
       }
 
       componentWillMount() {
-        this.reload( this.props );
+        this.reload( this.props )
       }
 
       componentWillUnmount() {
-        this.props.clearModelView( options );
+        this.props.clearModelView( options )
       }
 
       componentWillReceiveProps( nextProps ) {
-        if( this.props.params != nextProps.params )
-          this.reload( nextProps );
+        if( this.props.params != nextProps.params || (this.props.delayLoad && !nextProps.delayLoad) ) {
+          this.reload( nextProps )
+        }
       }
 
       render() {
@@ -70,10 +81,10 @@ export default (options) => {
           <ComposedComponent
               {...this.props}
           />
-        );
+        )
       }
     }
 
-  );
+  )
 
 }
