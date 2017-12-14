@@ -27,7 +27,14 @@ export default class Schema {
       model.relationships.forEach( (relDescr, field) => {
         if( !relDescr.has( 'relatedName' ) || !relDescr.has( 'type' ) || relDescr.get( 'reverse' ) )
           return;
-        let relModel = this.getModel( relDescr.get( 'type' ), true );
+        let relModel
+        try {
+          relModel = this.getModel( relDescr.get( 'type' ), true );
+        }
+        catch( e ) {
+          console.warn( `Unable to find related type "${relDescr.get('type')}", from "${model.type}.${field}"` )
+          return
+        }
         relModel.addReverseRelationship( relDescr.get( 'relatedName' ), new Map({
           type: model.type,
           relatedName: field,
