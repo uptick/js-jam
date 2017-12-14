@@ -23,7 +23,7 @@ export default class Model {
 
     // Build a list of all possible operations, then check if
     // it's been set in options.
-    let operations = ['list', 'create', 'detail', 'update', 'remove'];
+    let operations = ['list', 'create', 'detail', 'update', 'remove', 'options'];
     for( const field of this.iterManyToMany() ) {
       operations.push( field + 'Add' );
       operations.push( field + 'Remove' );
