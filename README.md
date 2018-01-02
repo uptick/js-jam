@@ -1,5 +1,8 @@
 # redux-jam
 
+[![npm version](https://badge.fury.io/js/redux-jam.svg)](http://badge.fury.io/js/redux-jam)
+![Downloads](http://img.shields.io/npm/dm/redux-jam.svg?style=flat)
+
 `redux-jam` aims to make interacting with relational database based APIs
 easier and more powerful.
 
@@ -11,7 +14,7 @@ npm install redux-jam
 
 or
 
-```
+```bash
 yarn add redux-jam
 ```
 
