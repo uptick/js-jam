@@ -120,4 +120,8 @@ export default class Instance {
     return this._db;
   }
 
+  getModel() {
+    return this._model;
+  }
+
 }

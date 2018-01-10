@@ -89,19 +89,19 @@ export default class Model {
     return obj;
   }
 
-  *iterFields() {
+  *iterFields(opts) {
     yield '_type';
     yield 'id';
     for( const x of this.attributes.keys() )
       yield x;
-    for( const x of this.iterRelationships() )
+    for( const x of this.iterRelationships(opts) )
       yield x;
   }
 
-  *iterRelationships() {
-    for( const x of this.iterForeignKeys() )
+  *iterRelationships(opts) {
+    for( const x of this.iterForeignKeys(opts) )
       yield x;
-    for( const x of this.iterManyToMany() )
+    for( const x of this.iterManyToMany(opts) )
       yield x;
   }
 
@@ -118,7 +118,7 @@ export default class Model {
   }
 
   *iterForeignKeys( opts ) {
-    const {includeReverse=false} = opts || {};
+    const { includeReverse = false } = opts || {};
     for( const field of this.relationships.keys() ) {
       if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
           || this.relationships.getIn( [field, 'many'] ) )

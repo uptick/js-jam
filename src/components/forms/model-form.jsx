@@ -7,6 +7,50 @@ function capitalize( string ) {
   return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
+const renderField = ({instance, fieldName, component, onChange, props = {}}) => {
+  const model = instance.getModel()
+  const field = model.getField(fieldName)
+  let value = instance[fieldName]
+  const isFK = model.fieldIsForeignKey(fieldName)
+  const label = field.get('label', fieldName)
+  props = {
+    default: field.get('default'),
+    name: fieldName,
+    label: capitalize(label),
+    value,
+    onChange: x => {
+      if(isFK && x) {
+        db.loadObjects(x)
+      }
+      instance[fieldName] = x
+      instance.save()
+      if(onChange)
+        onChange()
+    },
+    key: fieldName,
+    ...props
+  }
+  if( field.get('choices', undefined ) ) {
+    props.options = field.get('choices').toJS()
+    if( Array.isArray( props.options ) ) {
+      props.options = props.options.map(v => ({
+        value: v,
+        label: capitalize( v )
+      }))
+    }
+    else {
+      props.options = Object.keys(props.options).map(v => ({
+        value: v,
+        label: props.options[v]
+      }))
+    }
+  }
+  return React.createElement(
+    component,
+    props
+  )
+}
+
 class ModelForm extends Component {
 
   renderField( fieldName, model ) {
@@ -20,6 +64,9 @@ class ModelForm extends Component {
         value = db.get( value )
       }
     }
+    else if( model.fieldIsManyToMany( fieldName ) ) {
+      type = 'manytomany'
+    }
     else {
       type = field.get( 'type' )
     }
@@ -29,10 +76,11 @@ class ModelForm extends Component {
       console.warn(msg)
       return null
     }
+    const label = field.get('label', fieldName)
     let props = {
       default: field.get( 'default' ),
       name: fieldName,
-      label: capitalize( field.get( 'label' ) ),
+      label: capitalize( label ),
       value,
       onChange: x => {
         if( isFK && x ) {
@@ -57,13 +105,13 @@ class ModelForm extends Component {
   }
 
   render() {
-    const {schema, model: modelType} = this.props
+    const {db, model: modelType, exclude = []} = this.props
     let {fields} = this.props
-    const model = schema.getModel( modelType )
+    const model = db.schema.getModel( modelType )
     if( fields === undefined ) {
       fields = []
-      for( const f of model.iterFields() ) {
-        if( f == 'id' || f == '_type' ) {
+      for( const f of model.iterFields({includeReverse: true}) ) {
+        if( f == 'id' || f == '_type' || exclude.includes(f) ) {
           continue
         }
         fields.push( f )
@@ -80,3 +128,6 @@ class ModelForm extends Component {
 }
 
 export default ModelForm
+export {
+  renderField
+}
