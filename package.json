@@ -1,6 +1,6 @@
 {
   "name": "redux-jam",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "A Redux JSON-API model layer.",
   "repository": {
     "type": "git",
@@ -51,7 +51,7 @@
     "webpack-node-externals": "^1.5.4"
   },
   "dependencies": {
-    "js-tinyapi": "^0.0.10",
+    "js-tinyapi": "^0.1.0-alpha.0",
     "react": "^16.2.0",
     "react-redux": "^5.0.6",
     "redux": "^3.7.2",
