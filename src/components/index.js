@@ -1,6 +1,6 @@
 import withDB from './withDB'
-import TransactionComponent from './transaction-component'
-export { withDB, TransactionComponent }
+import withTransaction from './withTransaction'
+export { withDB, withTransaction }
 
 export ModelForm from './forms/model-form'
 import { renderField } from './forms/model-form'

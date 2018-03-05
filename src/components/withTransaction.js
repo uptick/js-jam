@@ -31,7 +31,7 @@ export default (options) => {
 
   )(
 
-    class TransactionComponent extends Component {
+    class InnerComponent extends Component {
 
       constructor( props ) {
         super( props )
@@ -46,7 +46,7 @@ export default (options) => {
         const {originalDB: db} = props
         const {name} = options || {}
         if( !db.getTransaction( name ) ) {
-          console.debug( `TransactionComponent: start transaction "${name}".` )
+          console.debug( `Start transaction "${name}".` )
           props.startTransaction( {schema, name} )
         }
       }
@@ -54,7 +54,7 @@ export default (options) => {
       commitTransaction( opts={} ) {
         const {schema, name} = options || {}
         const {sync} = opts
-        console.debug( `TransactionComponent: commit transaction "${name}".` )
+        console.debug( `Commit transaction "${name}".` )
         this.props.commitTransaction( {schema, name} )
         /* if( sync )
          *   this.props.sync( {schema} )*/
@@ -65,7 +65,7 @@ export default (options) => {
         const {schema, name} = options || {}
         if( db.getTransaction( name ) ) {
           this.props.abortTransaction( {schema, name} )
-          console.debug( `TransactionComponent: abort transaction "${name}".` )
+          console.debug( `Abort transaction "${name}".` )
         }
       }
 
@@ -114,5 +114,6 @@ export default (options) => {
         )
       }
     }
-  );
+  )
+
 }
