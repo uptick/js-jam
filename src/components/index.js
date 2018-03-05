@@ -1,10 +1,10 @@
-import DBComponent from './db-component'
+import withDB from './withDB'
 import TransactionComponent from './transaction-component'
-export {DBComponent, TransactionComponent}
+export { withDB, TransactionComponent }
 
 export ModelForm from './forms/model-form'
-import {renderField} from './forms/model-form'
-export {renderField}
+import { renderField } from './forms/model-form'
+export { renderField }
 
 export SyncStatus from './sync-status'
 export Spinner from './spinner'

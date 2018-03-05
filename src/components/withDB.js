@@ -20,7 +20,7 @@ export default (options) => {
       const { name, schema } = options || {}
       const { model = {} } = state
       const { views = {} } = model
-      const db = new DB( model.db, { schema } )
+      const db = props.db || new DB( model.db, {schema} )
       const content = views[name] || {}
 
       // Default to loading to catch that little moment before we've sent off
@@ -50,14 +50,14 @@ export default (options) => {
 
   )(
 
-    class DBComponent extends Component {
+    class InnerComponent extends Component {
 
       reload( props ) {
 
         // Only trigger a reload if we've not received `loading` as
         // true in our props.
         if( !props.delayLoad ) {
-          console.debug( 'DBComponent: Loading.' )
+          console.debug( 'Loading JAM view.' )
           props.loadModelView( {...options, props} )
         }
       }

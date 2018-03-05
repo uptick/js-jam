@@ -61,7 +61,7 @@ function* loadModelView( action ) {
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
     // clean, but it precludes the possibility of having different components
-    // use DBComponent.
+    // use withDB.
     // // Clear the database prior to loading data. We don't need to
     // // wait for it because we'll be waiting for the next put.
     // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
