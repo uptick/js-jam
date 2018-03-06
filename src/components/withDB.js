@@ -28,8 +28,9 @@ export default (options) => {
       const { meta = {}, ...rest } = content
 
       // Examine the `loading` value from our props, as it will influence
-      // our loading behavior.
-      let { loading = true } = content
+      // our loading behavior. Only flag that we're loading by default if
+      // we've been given a query.
+      let { loading = !!options.query } = content
       if( props.loading ) {
         loading = true
       }
@@ -55,10 +56,11 @@ export default (options) => {
       reload( props ) {
 
         // Only trigger a reload if we've not received `loading` as
-        // true in our props.
-        if( !props.delayLoad ) {
+        // true in our props, and we actually have a query in the
+        // options.
+        if( !props.delayLoad && options.query ) {
           console.debug( 'Loading JAM view.' )
-          props.loadModelView( {...options, props} )
+          props.loadModelView({ ...options, props })
         }
       }
 

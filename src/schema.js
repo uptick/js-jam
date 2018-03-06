@@ -14,8 +14,9 @@ export default class Schema {
   merge( descr={} ) {
     for( const type of Object.keys( descr ) ) {
       let model = this.getModel( type );
-      if( model === undefined )
-        model = new Model( type );
+      if( model === undefined ) {
+        model = new Model( type )
+      }
       model.merge( descr[type] );
       this.models = this.models.set( type, model );
     }

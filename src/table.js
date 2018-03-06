@@ -8,6 +8,8 @@ import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils'
  */
 class Table {
 
+  static filterRegex = /^([a-zA-Z](?:_?[a-zA-Z0-9]+))__([a-zA-Z](?:_?[a-zA-Z0-9]+))$/
+
   /**
    * `data` can be one of: a list of objects, a pre-constructed immutable
    * map containing table data, or undefined.
@@ -77,36 +79,74 @@ class Table {
    * Filter objects based on a query.
    */
   filter( idOrQuery ) {
-    return this._filterIndices( idOrQuery ).map( ii => this.data.getIn( ['objects', ii] ) );
+    return this._filterIndices( idOrQuery )
+               .map( ii => this.data.getIn( ['objects', ii] ) )
   }
 
   /**
    * Filter objects based on a query, returning the indices.
    */
   _filterIndices( idOrQuery ) {
-    if( !isObject( idOrQuery ) )
-      idOrQuery = {[this.idField]: idOrQuery};
-    let results;
-    for( const field in idOrQuery ) {
-      let id = idOrQuery[field];
-      results = this._reduceIndices( results, field, id );
+    if( !isObject( idOrQuery ) ) {
+      idOrQuery = { [this.idField]: idOrQuery }
     }
-    return results;
+    let results
+    for( const field in idOrQuery ) {
+      let value = idOrQuery[field]
+
+      // What kind of query are we looking at? If there's a double
+      // underscore somewhere it's something more fancy.
+      let match = field.match( Table.filterRegex )
+      if( match !== null ) {
+        switch( match[2].toLowerCase() ) {
+
+          // Lookup based on a string containing a value.
+          case 'contains':
+            results = this._reduceIndices( results, () =>
+              this.data
+                  .get( 'objects' )
+                  .map( (v, k) => v.get( match[1] ).includes( value ) ? k : null ) // TODO: Check if field exists.
+                  .filter( v => v !== null )
+            )
+            break
+
+          default:
+            throw new ModelError( `Unknown filter: ${match[2]}` )
+        }
+      }
+
+      // No double slash means we can perform an exact lookup. Currently
+      // this only works for fields with an index.
+      else {
+        results = this._reduceIndices( results, () => {
+          const index = this.data.getIn( ['indices', field] )
+          if( index === undefined ) {
+            throw new ModelError( `Table index not found: ${field}` )
+          }
+          return index.get( this._valueToIndexable( field, value ) )
+        })
+      }
+    }
+    return results
   }
 
   /**
    * Calculate overlapping indices based on a field/value lookup.
    */
-  _reduceIndices( indices, field, value ) {
-    const index = this.data.getIn( ['indices', field] );
-    if( index === undefined )
-      throw new ModelError( `Table index not found: ${field}` );
-    const other = index.get( this._valueToIndexable( field, value ) );
-    if( other === undefined )
-      return new Set();
-    if( indices === undefined )
-      return other;
-    return indices.intersect( other );
+  _reduceIndices( indices, getOtherIndices ) {
+    const other = getOtherIndices()
+    /* const index = this.data.getIn( ['indices', field] )
+     * if( index === undefined ) {
+     *   throw new ModelError( `Table index not found: ${field}` )
+     * }
+     * const other = index.get( this._valueToIndexable( field, value ) )*/
+    if( other === undefined ) {
+      return new Set()
+    }
+    if( indices === undefined ) {
+      return other
+    }
+    return indices.intersect( other )
   }
 
   set( object ) {

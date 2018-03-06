@@ -1,34 +1,34 @@
-import { bindActionCreators } from 'redux';
-import uuid from 'uuid';
-import { List, Map, OrderedMap, Set, OrderedSet } from 'immutable';
+import { bindActionCreators } from 'redux'
+import uuid from 'uuid'
+import { List, Map, OrderedMap, Set, OrderedSet } from 'immutable'
 
-import Table from './table';
+import Table from './table'
 import { toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
-         toList, Rollback, ModelError, splitJsonApiResponse } from './utils';
-import * as modelActions from './actions';
+         toList, Rollback, ModelError, splitJsonApiResponse } from './utils'
+import * as modelActions from './actions'
 
 export default class DB {
 
-  static Rollback = Rollback;
+  static Rollback = Rollback
 
   /**
    * Construct a DB from either a database data object, or a React
    * component. If using a React component, the data is assumed to
    * reside under `props.models.db`.
    */
-  constructor( data, options={} ) {
-    this.schema = options.schema;
+  constructor( data, options = {} ) {
+    this.schema = options.schema
     if( data ) {
       if( Map.isMap( data ) ) {
-        this.data = data;
+        this.data = data
       }
       else {
         let msg = `Unknown data given to DB constructor: "${data}"`
-        throw new ModelError( msg );
+        throw new ModelError( msg )
       }
     }
     else
-      this.reset();
+      this.reset()
   }
 
   reset() {
@@ -245,12 +245,12 @@ export default class DB {
     return this.schema.getModel( type, fail )
   }
 
-  getTable( type, branch='head' ) {
+  getTable( type, branch = 'head' ) {
     const data = this.data.getIn( [branch, type] );
     return new Table( type, {data, db: this} );
   }
 
-  saveTable( table, branch='head' ) {
+  saveTable( table, branch = 'head' ) {
     this.data = this.data.setIn( [branch, table.type], table.data );
   }
 
@@ -287,6 +287,20 @@ export default class DB {
 
   exists( id, branch='head' ) {
     return this.getTable( id._type, branch ).get( id.id ) !== undefined;
+  }
+
+  /**
+   * Filter data both locally and on the server.
+   */
+  filter( type, filter, options ) {
+    // TODO: Query the server if we have network and have not
+    //   been flagged to avoid external requests.
+    // if( navigator.onLine ) {
+    //  options.filter = filter  // TODO: merge? 
+    // }
+    return Promise.resolve(
+      this.getTable( type ).filter( filter )
+    )
   }
 
   /**
