@@ -1,8 +1,8 @@
 import {combineReducers} from 'redux'
 
 import DB from '../db'
-import {createReducer} from './utils'
-import {flattenObject} from '../utils'
+import { createReducer } from './utils'
+import { flattenObject } from '../utils'
 
 /**
  * Manages the state for models loaded form a server. As an example

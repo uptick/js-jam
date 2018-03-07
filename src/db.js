@@ -303,6 +303,12 @@ export default class DB {
     )
   }
 
+  query( options ) {
+    // TODO: Finish this.
+    const { type, filter } = options
+    return this.filter( type, filter, options )
+  }
+
   /**
    * get( object )
    * get( {_type:, id:}
@@ -527,18 +533,18 @@ export default class DB {
   }
 
   commit() {
-    let diffs = this.getDiffs();
+    let diffs = this.getDiffs()
 
     // Check the diffs for many-to-many updates and split those off into separate
     // diffs; they need separate API calls to set.
-    let newDiffs = [];
+    let newDiffs = []
     for( let diff of diffs ) {
-      let extraDiffs = [];
-      const id = getDiffId( diff );
-      const model = this.getModel( diff._type[0] || diff._type[1] );
+      let extraDiffs = []
+      const id = getDiffId( diff )
+      const model = this.getModel( diff._type[0] || diff._type[1] )
       for( const fieldName of model.iterManyToMany() ) {
         if( !diff[fieldName] )
-          continue;
+          continue
         if( diff[fieldName][0] && diff[fieldName][0].size ) {
           extraDiffs.push({
             _type: [id._type, id._type],
@@ -553,31 +559,31 @@ export default class DB {
             [fieldName]: [new OrderedSet(), diff[fieldName][1]]
           })
         }
-        delete diff[fieldName];
+        delete diff[fieldName]
       }
 
       // Only add the original diff if it either does not exist in the
       // tail, or has attributes to be set.
       if( !this.exists( getDiffId( diff ), 'tail' ) || Object.keys( diff ).length > 2 )
-        newDiffs.push( diff );
+        newDiffs.push( diff )
 
       for( const d of extraDiffs )
-        newDiffs.push( d );
+        newDiffs.push( d )
     }
 
     // Store the resulting diffs on top of existing ones.
     console.debug( `DB: Committing ${newDiffs.length} new diff(s)` )
-    this.data = this.data.update( 'diffs', x => x.concat( newDiffs ) );
+    this.data = this.data.update( 'diffs', x => x.concat( newDiffs ) )
 
     // Reset tail to head.
-    this.data = this.data.set( 'tail', this.data.get( 'head' ) );
+    this.data = this.data.set( 'tail', this.data.get( 'head' ) )
   }
 
   create( data ) {
-    const model = this.getModel( data._type );
-    let object = this.toObject( data );
+    const model = this.getModel( data._type )
+    let object = this.toObject( data )
     if( object.id === undefined )
-      object = object.set( 'id', uuid.v4() );
+      object = object.set( 'id', uuid.v4() )
     const diff = model.diff( undefined, object );
     /* this.addDiff( diff );*/
     this.applyDiff( diff );
@@ -613,10 +619,10 @@ export default class DB {
   }
 
   createOrUpdate( obj ) {
-    if( this.get( {_type: obj._type, id: obj.id} ) === undefined )
-      return this.create( obj );
+    if( this.get({ _type: obj._type, id: obj.id }) === undefined )
+      return this.create( obj )
     else
-      return this.update( obj );
+      return this.update( obj )
   }
 
   /* getOrCreate( type, query ) {

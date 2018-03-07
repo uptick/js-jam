@@ -82,7 +82,7 @@ export default class Model {
           get: function() {
             return {
               all: () => {
-                return this._values.get( name ).map( x =>
+                return (this._values.get( name ) || []).map( x =>
                   this._db.getInstance( x )
                 )
               },
@@ -109,9 +109,16 @@ export default class Model {
         // if one exists, and undefined otherwise.
         Object.defineProperty( obj, name, {
           get: function() {
+            let value = this._values.get( name )
+
+            // Without a DB object the best we can do is return the
+            // ID of the foreign-key.
+            if( !this._db ) {
+              return value
+            }
 
             // TODO: Use db.get once I've converted it.
-            let obj = this._db.get( this._values.get( name ) )
+            let obj = this._db.get( value )
             if( obj ) {
               obj = this._db.schema.toInstance( obj, this._db )
             }
@@ -247,8 +254,9 @@ export default class Model {
   getField( name ) {
     let field = this.attributes.get( name )
     if( field === undefined ) {
-      if( !this.relationships.has( name ) )
+      if( !this.relationships.has( name ) ) {
         throw new ModelError( `Model ${this.type} has no field ${name}.` )
+      }
       field = this.relationships.get( name )
     }
     return field
@@ -333,5 +341,27 @@ export default class Model {
       }
     }
     return {data}
+  }
+
+  switchOnField( field, ops ) {
+    let call
+    let info = this.relationships.get( field )
+    if( info !== undefined ) {
+      if( info.get( 'many' ) ) {
+        call = ops.manyToMany
+      }
+      else {
+        call = ops.foreignKey
+      }
+    }
+    else {
+      info = this.attributes.get( field )
+      if( info !== undefined ) {
+        call = ops.attribute
+      }
+    }
+    if( call ) {
+      call()
+    }
   }
 }

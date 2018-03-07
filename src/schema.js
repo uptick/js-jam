@@ -1,36 +1,36 @@
-import {Map} from 'immutable'
+import { Map } from 'immutable'
 
 import DB from './db'
 import Model from './model'
-import {ModelError} from './utils'
+import { ModelError } from './utils'
 
 export default class Schema {
 
-  constructor( descr={} ) {
-    this.models = new Map();
-    this.merge( descr );
+  constructor( descr = {} ) {
+    this.models = new Map()
+    this.merge( descr )
   }
 
-  merge( descr={} ) {
+  merge( descr = {} ) {
     for( const type of Object.keys( descr ) ) {
-      let model = this.getModel( type );
+      let model = this.getModel( type )
       if( model === undefined ) {
         model = new Model( type )
       }
-      model.merge( descr[type] );
-      this.models = this.models.set( type, model );
+      model.merge( descr[type] )
+      this.models = this.models.set( type, model )
     }
-    this._updateReverseRelationships();
+    this._updateReverseRelationships()
   }
 
   _updateReverseRelationships() {
     this.models.forEach( (model, name) => {
       model.relationships.forEach( (relDescr, field) => {
         if( !relDescr.has( 'relatedName' ) || !relDescr.has( 'type' ) || relDescr.get( 'reverse' ) )
-          return;
+          return
         let relModel
         try {
-          relModel = this.getModel( relDescr.get( 'type' ), true );
+          relModel = this.getModel( relDescr.get( 'type' ), true )
         }
         catch( e ) {
           console.warn( `Unable to find related type "${relDescr.get('type')}", from "${model.type}.${field}"` )
@@ -41,14 +41,14 @@ export default class Schema {
           relatedName: field,
           reverse: true,
           many: true
-        }));
-        this.models = this.models.set( relModel.type, relModel );
-      });
-    });
+        }))
+        this.models = this.models.set( relModel.type, relModel )
+      })
+    })
   }
 
   db( data ) {
-    return new DB( data, {schema: this} );
+    return new DB( data, {schema: this} )
   }
 
   getModel( type, fail = false ) {
@@ -60,72 +60,77 @@ export default class Schema {
   }
 
   toInstance( data, db ) {
-    const model = this.getModel( data._type );
+    const model = this.getModel( data._type )
     if( model === undefined )
-      throw new ModelError( `Unknown model type: ${data._type}` );
-    return model.toInstance( data, db );
+      throw new ModelError( `Unknown model type: ${data._type}` )
+    return model.toInstance( data, db )
   }
 
   toObjects( data, db ) {
-    return data.map( objData => this.toObject( objData, db ) );
+    return data.map( objData => this.toObject( objData, db ) )
   }
 
   toObject( data, db ) {
-    const model = this.getModel( data._type );
+    const model = this.getModel( data._type )
     if( model === undefined )
-      throw new ModelError( `Unknown model type: ${data._type}` );
-    return model.toObject( data, db );
+      throw new ModelError( `Unknown model type: ${data._type}` )
+    return model.toObject( data, db )
+  }
+
+  createInstance( type, data ) {
+    let model = this.getModel( type )
+    return new model.Instance( new Map( (data || {}) ), model )
   }
 
         /* calcDiffs( state ) {
-           let diffs = [];
-           const { collections: { local }} = state;
+           let diffs = []
+           const { collections: { local }} = state
            for( const type of Object.keys( local ) ) {
            for( const id of Object.keys( local[type] ) ) {
-           const result = Model.calcDiff( state, type, id );
+           const result = Model.calcDiff( state, type, id )
            if( result )
-           diffs.append( result );
+           diffs.append( result )
            }
            }
-           return diffs;
+           return diffs
            }
 
            sync() {
-           const diffs = this.calcDiffs();
-           let deferred = [];
+           const diffs = this.calcDiffs()
+           let deferred = []
            for( const diff of diffs ) {
-           let def;
+           let def
            if( diff.op == 'create' )
            def = this.create( diff )
            else if( diff.op == 'remove' )
-           def = this.remove( diff );
+           def = this.remove( diff )
            else
-           def = this.update( diff );
-           deferred.push( def );
+           def = this.update( diff )
+           deferred.push( def )
            }
            return Promise.all( deferred )
-           .then( () => diffs );
+           .then( () => diffs )
            }
 
            create( diff ) {
-           const type = diff.model.type.toLowerCase();
-           return this[type].create( diff.model );
+           const type = diff.model.type.toLowerCase()
+           return this[type].create( diff.model )
            }
 
            remove( diff ) {
-           const type = diff.model.type.toLowerCase();
-           return this[type].remove( diff.model.id );
+           const type = diff.model.type.toLowerCase()
+           return this[type].remove( diff.model.id )
            }
 
            update( diff ) {
-           const type = diff.model.type.toLowerCase();
-           let fields = {};
+           const type = diff.model.type.toLowerCase()
+           let fields = {}
            for( const name of diff.fields )
-           fields[name] = diff.model.attributes[name];
+           fields[name] = diff.model.attributes[name]
            const data = {
            id: diff.model.id,
            attributes: fields
-           };
-           return this[type].update( data );
+           }
+           return this[type].update( data )
            } */
 }

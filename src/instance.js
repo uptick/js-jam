@@ -21,19 +21,44 @@ export class BaseInstance {
     if( isEmpty( model ) ) {
       throw new ModelError( 'Instance: No model given.' )
     }
-    if( isEmpty( db ) ) {
-      throw new ModelError( 'Instance: No DB given.' )
-    }
+    /* if( isEmpty( db ) ) {
+     *   throw new ModelError( 'Instance: No DB given.' )
+     * }*/
     this.id = data.get( 'id' ) || uuid.v4()
     this._db = db
     this._model = model
     this._type = model.type
-    this._initial = new Map()
-    this._values = data
+    this._initial = data
+    this._values = new Map()
+    this._setInitialValues( data )
   }
 
-  save() {
-    this._db.createOrUpdate( this._values )
+  set( field, value ) {
+    this._model.switchOnField( field, {
+      attribute: () => {
+        this[field] = value
+      },
+      foreignKey: () => {
+        this[field] = value
+      },
+      manyToMany: () => {
+        this[field].add( value )
+      }
+    })      
+    return this
+  }
+
+  save( db ) {
+    if( !db ) {
+      db = this._db
+    }
+    // TODO: This is a bit silly, surely it could just be this._values?
+    db.createOrUpdate({
+      ...(this._values.toJS()),
+      _type: this._type,
+      id: this.id
+    })
+    return db
   }
 
   delete() {
@@ -50,6 +75,22 @@ export class BaseInstance {
 
   getModel() {
     return this._model
+  }
+
+  _setInitialValues( data ) {
+    for( const fieldName of this._model.iterFields() ) {
+      let value = data.get( fieldName )
+      if( value === undefined ) {
+        // TODO: Check for default value.
+        if( this._model.fieldIsManyToMany( fieldName ) ) {
+          value = []
+        }
+        else if( !this._model.fieldIsForeignKey( fieldName ) ) {
+          value = ''
+        }
+      }
+      this._values = this._values.set( fieldName, value )
+    }
   }
 
 }

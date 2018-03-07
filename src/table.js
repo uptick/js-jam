@@ -100,13 +100,34 @@ class Table {
       if( match !== null ) {
         switch( match[2].toLowerCase() ) {
 
+            // TODO: Sooo much optimisation here. These filters should be easy to
+            //  write and much more efficient.
+
           // Lookup based on a string containing a value.
           case 'contains':
             results = this._reduceIndices( results, () =>
-              this.data
-                  .get( 'objects' )
-                  .map( (v, k) => v.get( match[1] ).includes( value ) ? k : null ) // TODO: Check if field exists.
-                  .filter( v => v !== null )
+              // TODO: This is a bit annoying, having to conver to a Set.
+              // TODO: Also, what about data types? Should fail nicely if no 'includes'
+              new Set( this.data
+                           .get( 'objects' )
+                           .map( (v, k) => v.get( match[1] ).includes( value ) ? k : undefined ) // TODO: Check if field exists.
+                           .filter( v => v !== undefined ) )
+            )
+            break
+
+          case 'isnull':
+            results = this._reduceIndices( results, () =>
+              // TODO: This is a bit annoying, having to conver to a Set.
+              new Set( this.data
+                           .get( 'objects' )
+                           .map( (v, k) => {
+                             // TODO: Better manage types.
+                             if( this.model.fieldIsManyToMany( match[1] ) )
+                               return v.get( match[1] ).size == 0 ? k : undefined
+                             else
+                               return v.get( match[1] ) == null ? k : undefined // TODO: Check if field exists.
+                           })
+                           .filter( v => v !== undefined ) )
             )
             break
 
@@ -121,9 +142,17 @@ class Table {
         results = this._reduceIndices( results, () => {
           const index = this.data.getIn( ['indices', field] )
           if( index === undefined ) {
-            throw new ModelError( `Table index not found: ${field}` )
+            console.warn( `Table index not found for type "${field}", will be inefficient.` )
+            /* throw new ModelError( `Table index not found: ${field}` )*/
+            // TODO: This is a bit annoying, having to conver to a Set.
+            return new Set( this.data
+                                .get( 'objects' )
+                                .map( (v, k) => (v == value) ? k : null )
+                                .filter( v => v !== null ) )
           }
-          return index.get( this._valueToIndexable( field, value ) )
+          else {
+            return index.get( this._valueToIndexable( field, value ) )
+          }
         })
       }
     }

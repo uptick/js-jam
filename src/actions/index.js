@@ -1,6 +1,11 @@
 import {createAction} from './utils'
 
 /**
+ * Basic actions.
+ */
+export const saveDB = createAction( 'MODEL_SAVE_DB' )
+
+/**
  * Transaction actions.
  */
 export const startTransaction = createAction( 'MODEL_START_TRANSACTION' )

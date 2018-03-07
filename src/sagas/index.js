@@ -8,8 +8,6 @@ import {eachInline} from './utils'
 
 import { changePage } from './pagination'
 
-let mutateIndex = 0
-
 function* loadModelView( action ) {
   try {
     const { schema, name, query, props } = action.payload
@@ -28,35 +26,38 @@ function* loadModelView( action ) {
 
     // A place to hold the JSON responses to be loaded.
     let jsonData = []
-    
+
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
     for( const name of Object.keys( query ) ) {
-      console.debug( `loadModelView: Looking up ${name}.` )
-      const data = yield call( query[name], props )
-      if( data !== null ) {
-        jsonData.push( data )
-      }
-      if( data ) {
-        if( Array.isArray( data.data ) ) {
+      console.debug( `loadModelView: Looking up "${name}".` )
 
-          // First, convert the results into an array of IDs.
-          results[name] = data.data.map( x => makeId( x.type, x.id ) )
+      // TODO: Add this back in.
+      /* const data = yield call( query[name], props )
+       * if( data ) {
+       *   jsonData.push( data )
+       *   if( Array.isArray( data.data ) ) {
 
-          // Store any links and pagination information.
-          meta[name] = {
-            ...(data.meta || {})
-          }
-          if( data.links ) {
-            meta[name].links = data.links
-          }
-        }
-        else {
-          results[name] = makeId( data.data.type, data.data.id )
-        }
-      }
-      else
-        results[name] = null
+       *     // First, convert the results into an array of IDs.
+       *     results[name] = data.data.map( x => makeId( x.type, x.id ) )
+
+       *     // Store any links and pagination information.
+       *     meta[name] = {
+       *       ...(data.meta || {})
+       *     }
+       *     if( data.links ) {
+       *       meta[name].links = data.links
+       *     }
+       *   }
+       *   else {
+       *     results[name] = makeId( data.data.type, data.data.id )
+       *   }
+       * }
+       * else
+       *   results[name] = null*/
+
+      const data = yield call( [db, db.query], query[name] )
+      results[name] = data
     }
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
@@ -67,16 +68,18 @@ function* loadModelView( action ) {
     // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
 
     // Merge in the loaded data and wait for it to be finished.
-    yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
-    yield take(
-      action => {
-        return (
-          action.type == 'MODEL_LOAD_JSON_DONE'
-          && action.payload
-          && action.payload.jsonData == jsonData
-        )
-      }
-    )
+    if( jsonData.length > 0 ) {
+      yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
+      yield take(
+        action => {
+          return (
+            action.type == 'MODEL_LOAD_JSON_DONE'
+            && action.payload
+            && action.payload.jsonData == jsonData
+          )
+        }
+      )
+    }
 
     yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta}} )
   }
@@ -129,6 +132,26 @@ export function* mutate( schema, mutation ) {
   let db = schema.db( state.model.db )
   mutation( db )
   yield put( {type: 'MODEL_SET_DB_DATA', payload: db.data} )
+}
+
+/**
+ * Mutate a DB by saving contents.
+ *
+ * This is called by a component when changes have been made to a
+ * local copy of the DB, and now those changes need to be saved to
+ * the redux store.
+ *
+ * TODO: We currently just stomp on the data, however it occurs to me
+ * that we may need to calcualte diffs and apply them on top, as
+ * there may have been mutations in the middle.
+ */
+export function* saveDB( payload ) {
+  yield call(
+    mutate,
+    payload.schema,
+    db =>
+      db.data = payload.data  // TODO: Super cheeky.
+  )
 }
 
 /**
@@ -250,6 +273,9 @@ function* clear( payload ) {
  */
 export function* mutationSerializer( action ) {
   switch( action.type ) {
+    case 'MODEL_SAVE_DB':
+      yield call( saveDB, action.payload )
+      break
     case 'MODEL_START_TRANSACTION':
       yield call( startTransaction, action.payload )
       break
@@ -296,6 +322,7 @@ export default function* modelSaga() {
       eachInline( 'MODEL_SYNC', sync ),
       eachInline(
         [
+          'MODEL_SAVE_DB',
           'MODEL_START_TRANSACTION',
           'MODEL_SAVE_TRANSACTION',
           'MODEL_ABORT_TRANSACTION',
