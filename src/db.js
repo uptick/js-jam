@@ -304,9 +304,8 @@ export default class DB {
   }
 
   query( options ) {
-    // TODO: Finish this.
-    const { type, filter } = options
-    return this.filter( type, filter, options )
+    const { type, filter, ...other } = options
+    return this.filter( type, filter, other )
   }
 
   /**

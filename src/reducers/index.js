@@ -141,12 +141,12 @@ const viewReducer = createReducer({}, {
    * Indicates a model view is currently loading.
    */
   MODEL_LOAD_VIEW_SUCCESS( state, action ) {
-    const { name, results, meta } = action.payload;
-    const viewState = state[name] || {};
-    console.debug( `Model: View load success: ${name}: `, results );
+    const { view, results, meta } = action.payload
+    const viewState = state[view] || {}
+    console.debug( `Model: View load success: ${view}: `, results );
     return {
       ...state,
-      [name]: {
+      [view]: {
         ...viewState,
         ...results,
         meta: meta || {},

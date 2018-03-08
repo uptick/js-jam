@@ -51,6 +51,13 @@ export default class Schema {
     return new DB( data, {schema: this} )
   }
 
+  query( query ) {
+    return {
+      schema: this,
+      ...query
+    }
+  }
+
   getModel( type, fail = false ) {
     let model = this.models.get( type )
     if( fail && model === undefined ) {

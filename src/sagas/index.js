@@ -1,17 +1,17 @@
-import {takeLatest} from 'redux-saga'
-import {call, apply, put, take, select} from 'redux-saga/effects'
-import {OrderedSet} from 'immutable'
+import { takeLatest } from 'redux-saga'
+import { call, apply, put, take, select } from 'redux-saga/effects'
+import { OrderedSet } from 'immutable'
 
-import {makeId, getDiffId} from '../utils'
+import { makeId, getDiffId } from '../utils'
 import DB from '../db'
-import {eachInline} from './utils'
+import { eachInline } from './utils'
 
 import { changePage } from './pagination'
 
 function* loadModelView( action ) {
   try {
-    const { schema, name, query, props } = action.payload
-    yield put( { type: 'MODEL_LOAD_VIEW_REQUEST', payload: { name } } )
+    const { schema, view, props, ...queries } = action.payload
+    yield put({ type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name} })
 
     // Load the DB from the state.
     const state = yield select()
@@ -29,13 +29,22 @@ function* loadModelView( action ) {
 
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
-    for( const name of Object.keys( query ) ) {
-      console.debug( `loadModelView: Looking up "${name}".` )
+    for( const name of Object.keys( queries ) ) {
+      console.debug( `loadModelView: Looking up "${view}.${name}"` )
 
-      // TODO: Add this back in.
-      /* const data = yield call( query[name], props )
-       * if( data ) {
+      const data = yield call( [db, db.query], queries[name] )
+      if( data ) {
+        results[name] = data
+      }
+      else {
+        results[name] = null
+      }
+
+      /* const data = yield call( queries[name], props )
+       * if( data !== null ) {
        *   jsonData.push( data )
+       * }
+       * if( data ) {
        *   if( Array.isArray( data.data ) ) {
 
        *     // First, convert the results into an array of IDs.
@@ -55,9 +64,6 @@ function* loadModelView( action ) {
        * }
        * else
        *   results[name] = null*/
-
-      const data = yield call( [db, db.query], query[name] )
-      results[name] = data
     }
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
@@ -81,7 +87,7 @@ function* loadModelView( action ) {
       )
     }
 
-    yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta}} )
+    yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {view, results, meta}} )
   }
   catch( e ) {
     console.error( e )

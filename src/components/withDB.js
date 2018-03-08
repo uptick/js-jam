@@ -17,11 +17,11 @@ export default (options) => {
   return ComposedComponent => connect(
 
     (state, props) => {
-      const { name, schema } = options || {}
+      const { view, schema } = options || {}
       const { model = {} } = state
       const { views = {} } = model
       const db = props.db || new DB( model.db, {schema} )
-      const content = views[name] || {}
+      const content = views[view] || {}
 
       // Default to loading to catch that little moment before we've sent off
       // the first REQUEST action.
@@ -58,7 +58,7 @@ export default (options) => {
         // Only trigger a reload if we've not received `loading` as
         // true in our props, and we actually have a query in the
         // options.
-        if( !props.delayLoad && options.query ) {
+        if( !props.delayLoad ) {
           console.debug( 'Loading JAM view.' )
           props.loadModelView({ ...options, props })
         }
