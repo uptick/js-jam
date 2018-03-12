@@ -1,4 +1,4 @@
-import { Map } from 'immutable'
+import { OrderedSet, Map } from 'immutable'
 import uuid from 'uuid'
 
 import {
@@ -78,12 +78,12 @@ export class BaseInstance {
   }
 
   _setInitialValues( data ) {
-    for( const fieldName of this._model.iterFields() ) {
+    for( const fieldName of this._model.iterFields({ includeReverse: true }) ) {
       let value = data.get( fieldName )
       if( value === undefined ) {
         // TODO: Check for default value.
         if( this._model.fieldIsManyToMany( fieldName ) ) {
-          value = []
+          value = new OrderedSet()
         }
         else if( !this._model.fieldIsForeignKey( fieldName ) ) {
           value = ''

@@ -428,3 +428,18 @@ export function collectJsonApi( response ) {
     models = models[0]
   return models
 }
+
+export function saveJson( object, filename ) {
+  let a = document.createElement( 'a' )
+  a.setAttribute( 'href', 'data:text/plain;charset=utf-u,' + encodeURIComponent( JSON.stringify( object ) ) )
+  a.setAttribute( 'download', filename )
+  a.click()
+}
+
+export function loadJson( file ) {
+  return new Promise( (resolve, reject) => {
+    let reader = new FileReader()
+    reader.readAsText( file, 'UTF-8' )
+    reader.onload = ev => resolve( JSON.parse( ev.target.result ) )
+  })
+}

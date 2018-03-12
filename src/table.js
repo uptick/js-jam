@@ -13,6 +13,8 @@ class Table {
   /**
    * `data` can be one of: a list of objects, a pre-constructed immutable
    * map containing table data, or undefined.
+   *
+   * TODO: This is a bit inefficient given how often it will be called.
    */
   constructor( type, options = {} ) {
     let { data, db, idField = 'id', indices } = options
@@ -22,45 +24,51 @@ class Table {
     this.idField = idField
 
     // Figure out what my indices are.
-    this.indices = new Set( indices || this.model.indices || ['id'] );
+    this.indices = new Set( indices || this.model.indices || ['id'] )
     if( !this.indices.has( idField ) )
-      throw new ModelError( `idField: ${idField} not found in indices: ${indices}` );
+      throw new ModelError( `idField: ${idField} not found in indices: ${indices}` )
 
     if( data ) {
       if( Array.isArray( data ) ) {
         this.data = new Map({
           objects: db.toObjects( new List( data ) ),
-          indices: new Map( this.indices.toJS().map( x => [x, new Map( this._toIndexMap( data, x ) )] ) )
-        });
+          indices: new Map( this.indices.toJS().map( x =>
+            [x, new Map( this._toIndexMap( data, x ) )] )
+          )
+        })
       }
       else if( Map.isMap( data ) )
-        this.data = data;
-      else
-        throw new ModelError( 'Unknown data given to table constructor.' );
+        this.data = data
+      else {
+        this.data = new Map({
+          objects: db.toObjects( new List( data.objects ) ),
+          indices: fromJS( data.indices )
+        })
+      }
     }
     else
-      this.reset();
+      this.reset()
   }
 
   reset() {
     this.data = new Map({
       objects: new List(),
       indices: new Map( this.indices.toJS().map( x => [x, new Map()] ) )
-    });
+    })
   }
 
   _toIndexMap( objects, key='id' ) {
-    let index = new Map();
+    let index = new Map()
     if( !isEmpty( objects ) ) {
       objects.forEach( (item, ii) => {
-        const val = this._valueToIndexable( key, item[key] );
+        const val = this._valueToIndexable( key, item[key] )
         if( !index.has( val ) )
-          index = index.set( val, new Set([ ii ]) );
+          index = index.set( val, new Set([ ii ]) )
         else
-          index = index.updateIn([ val ], x => x.add( ii ));
-      });
+          index = index.updateIn([ val ], x => x.add( ii ))
+      })
     }
-    return index;
+    return index
   }
 
   /**
@@ -127,6 +135,17 @@ class Table {
                              else
                                return v.get( match[1] ) == null ? k : undefined // TODO: Check if field exists.
                            })
+                           .filter( v => v !== undefined ) )
+            )
+            break
+
+          case 'in':
+            value = this.db.makeId( value )
+            results = this._reduceIndices( results, () =>
+              // TODO: This is a bit annoying, having to conver to a Set.
+              new Set( this.data
+                           .get( 'objects' )
+                           .map( (v, k) => v.get( match[1] ).has( value ) ? k : undefined )
                            .filter( v => v !== undefined ) )
             )
             break
@@ -303,14 +322,14 @@ class Table {
     }
   }
 
-  addRelationship( id, field, related ) {
+  addRelationship( id, field, relatedId ) {
     const index = this._getIndex( id );
-    this.data = this.data.updateIn( ['objects', index, field], x => x.add( ID( related ) ) );
+    this.data = this.data.updateIn( ['objects', index, field], x => x.add( relatedId ) )
   }
 
-  removeRelationship( id, field, related ) {
+  removeRelationship( id, field, relatedId ) {
     const index = this._getIndex( id );
-    this.data = this.data.updateIn( ['objects', index, field], x => x.delete( ID( related ) ) );
+    this.data = this.data.updateIn( ['objects', index, field], x => x.delete( relatedId ) )
   }
 
   /**
@@ -354,10 +373,10 @@ class Table {
     // Creation.
     if( diff._type[ii] === undefined ) {
       if( obj !== undefined )
-        throw ModelError( 'Trying to create an object that already exists.' );
-      let newObj = {};
-      Object.keys( diff ).forEach( x => newObj[x] = diff[x][jj] );
-      this.set( this.db.toObject( newObj ) );
+        throw ModelError( 'Trying to create an object that already exists.' )
+      let newObj = {}
+      Object.keys( diff ).forEach( x => newObj[x] = diff[x][jj] )
+      this.set( this.db.toObject( newObj ) )
     }
 
     // Removal.

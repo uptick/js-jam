@@ -1,6 +1,6 @@
-import withDB from './withDB'
+import withView from './withView'
 import withTransaction from './withTransaction'
-export { withDB, withTransaction }
+export { withView, withTransaction }
 
 export ModelForm from './forms/model-form'
 import { renderField } from './forms/model-form'

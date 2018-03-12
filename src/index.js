@@ -20,3 +20,5 @@ export {reducer, createReducer}
 export * from './components'
 
 export * from './helpers'
+
+export jamTransform from './persist'

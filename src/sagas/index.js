@@ -1,6 +1,7 @@
 import { takeLatest } from 'redux-saga'
 import { call, apply, put, take, select } from 'redux-saga/effects'
 import { OrderedSet } from 'immutable'
+import isCallable from 'is-callable'
 
 import { makeId, getDiffId } from '../utils'
 import DB from '../db'
@@ -10,8 +11,10 @@ import { changePage } from './pagination'
 
 function* loadModelView( action ) {
   try {
-    const { schema, view, props, ...queries } = action.payload
+    const { schema, name, props, queries } = action.payload
     yield put({ type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name} })
+
+    console.log( 'Quer: ', queries )
 
     // Load the DB from the state.
     const state = yield select()
@@ -29,16 +32,19 @@ function* loadModelView( action ) {
 
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
-    for( const name of Object.keys( queries ) ) {
-      console.debug( `loadModelView: Looking up "${view}.${name}"` )
+    for( const queryName of Object.keys( queries ) ) {
+      console.debug( `loadModelView: Looking up "${name}.${queryName}"` )
 
-      const data = yield call( [db, db.query], queries[name] )
-      if( data ) {
-        results[name] = data
-      }
-      else {
-        results[name] = null
-      }
+      let data
+      const query = queries[queryName]
+      if( isCallable( query ) )
+        data = yield call( query, db, state )
+      else
+        data = yield call( [db, db.query], query )
+      if( data )
+        results[queryName] = data
+      else
+        results[queryName] = null
 
       /* const data = yield call( queries[name], props )
        * if( data !== null ) {
@@ -68,7 +74,7 @@ function* loadModelView( action ) {
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
     // clean, but it precludes the possibility of having different components
-    // use withDB.
+    // use withView.
     // // Clear the database prior to loading data. We don't need to
     // // wait for it because we'll be waiting for the next put.
     // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
@@ -87,11 +93,11 @@ function* loadModelView( action ) {
       )
     }
 
-    yield put( {type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {view, results, meta}} )
+    yield put({ type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta} })
   }
   catch( e ) {
     console.error( e )
-    yield put( {type: 'MODEL_LOAD_VIEW_FAILURE', errors: e.message} )
+    yield put({ type: 'MODEL_LOAD_VIEW_FAILURE', errors: e.message })
   }
 }
 

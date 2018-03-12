@@ -17,20 +17,20 @@ export default (options) => {
   return ComposedComponent => connect(
 
     (state, props) => {
-      const { view, schema } = options || {}
+      const { name, schema } = options || {}
       const { model = {} } = state
       const { views = {} } = model
       const db = props.db || new DB( model.db, {schema} )
-      const content = views[view] || {}
+      const content = views[name] || {queries: {}}
 
       // Default to loading to catch that little moment before we've sent off
       // the first REQUEST action.
-      const { meta = {}, ...rest } = content
+      /* const { meta = {}, queries, loading = !!options.queries } = content*/
 
       // Examine the `loading` value from our props, as it will influence
       // our loading behavior. Only flag that we're loading by default if
       // we've been given a query.
-      let { loading = !!options.query } = content
+      let { loading = !!options.queries } = content
       if( props.loading ) {
         loading = true
       }
@@ -38,16 +38,32 @@ export default (options) => {
       // Start constructing the results. `delayLoad` is set by passing
       // in `loading` as true into our props. It indicates that any load
       // requests that come in should be ignored until `loading` is false.
-      let results = {
-        ...rest,
-        loading,
-        delayLoad: props.loading,
-        db
+      let results = { db }
+      if( name ) {
+        results[name] = {
+          ...content,
+          loading,
+          delayLoad: props.loading,
+        }
       }
       return results
     },
 
-    dispatch => bindActionCreators( modelActions, dispatch )
+    dispatch => ({
+      ...bindActionCreators( modelActions, dispatch ),
+      ...bindActionCreators({
+        updateView: ( ...args ) => {
+          return {
+            type: 'MODEL_LOAD_VIEW',
+            payload: {
+              schema,
+              name: options.name,
+              queries: (args.length == 1) ? args[0] : options.queries
+            }
+          }
+        }
+      }, dispatch )
+    })
 
   )(
 
@@ -58,7 +74,7 @@ export default (options) => {
         // Only trigger a reload if we've not received `loading` as
         // true in our props, and we actually have a query in the
         // options.
-        if( !props.delayLoad ) {
+        if( !props.delayLoad && options.queries ) {
           console.debug( 'Loading JAM view.' )
           props.loadModelView({ ...options, props })
         }

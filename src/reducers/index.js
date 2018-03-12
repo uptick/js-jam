@@ -127,30 +127,35 @@ const viewReducer = createReducer({}, {
    * Indicates a model view is currently loading.
    */
   MODEL_LOAD_VIEW_REQUEST( state, action ) {
-    const {name} = action.payload;
-    console.debug( `Model: View load request: ${name}.` );
+    const { name } = action.payload
+    const viewState = state[name] || {}
+    console.debug( `Model: View load request: ${name}.` )
     return {
       ...state,
       [name]: {
+        queries: {},
+        ...viewState,
         loading: true
       }
-    };
+    }
   },
 
   /**
    * Indicates a model view is currently loading.
    */
   MODEL_LOAD_VIEW_SUCCESS( state, action ) {
-    const { view, results, meta } = action.payload
-    const viewState = state[view] || {}
-    console.debug( `Model: View load success: ${view}: `, results );
+    const { name, results } = action.payload
+    const viewState = state[name] || {}
+    console.debug( `Model: View load success: ${name}: `, results )
     return {
       ...state,
-      [view]: {
+      [name]: {
         ...viewState,
-        ...results,
-        meta: meta || {},
-        loading: false,
+        queries: {
+          ...viewState.queries,
+          ...results
+        },
+        loading: false
       }
     };
   },
@@ -160,7 +165,9 @@ const viewReducer = createReducer({}, {
     console.debug( `Model: View load clear: "${name}".` );
     return {
       ...state,
-      [name]: {}
+      [name]: {
+        queries: {}
+      }
     };
   },
 

@@ -87,9 +87,11 @@ export default class Model {
                 )
               },
               add: x => {
-                this._values = this._values.updateIn( [name], y =>
-                  y.add( this._db.getId( x ) )
-                )
+                if( rel.get( 'reverse' ) )
+                  throw new ModelError( 'Cannot set reverse relationships.' )
+                this._values = this._values.updateIn( [name], y => {
+                  return y.add( this._db.getId( x ) )
+                })
               },
               remove: x => {
                 this._values = this._values.updateIn( [name], y =>
@@ -156,6 +158,7 @@ export default class Model {
     if( !this.relationships.has( field ) ) {
       this.relationships = this.relationships.set( field, relation )
       this._makeRecord()
+      this._makeInstanceSubclass()
     }
     // TODO: Check that the fields are compatible.
   }
@@ -189,24 +192,24 @@ export default class Model {
     return obj
   }
 
-  *iterFields(opts) {
+  *iterFields( opts ) {
     yield '_type'
     yield 'id'
     for( const x of this.attributes.keys() )
       yield x
-    for( const x of this.iterRelationships(opts) )
+    for( const x of this.iterRelationships( opts ) )
       yield x
   }
 
-  *iterRelationships(opts) {
-    for( const x of this.iterForeignKeys(opts) )
+  *iterRelationships( opts ) {
+    for( const x of this.iterForeignKeys( opts ) )
       yield x
-    for( const x of this.iterManyToMany(opts) )
+    for( const x of this.iterManyToMany( opts ) )
       yield x
   }
 
   *iterManyToMany( opts ) {
-    const {includeReverse=false} = opts || {}
+    const { includeReverse = false } = opts || {}
     for( const field of this.relationships.keys() ) {
       if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
           || !this.relationships.getIn( [field, 'many'] ) )

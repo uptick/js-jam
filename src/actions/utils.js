@@ -8,7 +8,7 @@ export function createAction( type, thunk ) {
     // If we were given a "thunk" function, return it instead
     // of a standard Redux action.
     if( thunk !== undefined ) {
-      return (dispatch, getState) => thunk( dispatch, getState, ...args )
+      return (dispatch, getState) => thunk( dispatch, getState, type, ...args )
     }
 
     // Stadnard action.

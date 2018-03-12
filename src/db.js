@@ -4,7 +4,7 @@ import { List, Map, OrderedMap, Set, OrderedSet } from 'immutable'
 
 import Table from './table'
 import { toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
-         toList, Rollback, ModelError, splitJsonApiResponse } from './utils'
+         toList, Rollback, ModelError, splitJsonApiResponse, saveJson, loadJson } from './utils'
 import * as modelActions from './actions'
 
 export default class DB {
@@ -18,20 +18,13 @@ export default class DB {
    */
   constructor( data, options = {} ) {
     this.schema = options.schema
-    if( data ) {
-      if( Map.isMap( data ) ) {
-        this.data = data
-      }
-      else {
-        let msg = `Unknown data given to DB constructor: "${data}"`
-        throw new ModelError( msg )
-      }
-    }
+    if( Map.isMap( data ) )
+      this.data = data
     else
-      this.reset()
+      this.reset( data )
   }
 
-  reset() {
+  reset( data ) {
     this.data = new Map({
       head: new Map(),
       tail: new Map(),
@@ -49,16 +42,29 @@ export default class DB {
       transactions: new Map(),
       loads: new List(),
       objectLoads: new List()
-    });
+    })
+    if( data ) {
+      const { head = {}, tail = {} } = data
+      Object.keys( head ).forEach( type => {
+        let tbl = new Table( type, {data: head[type], db: this} )
+        this.data = this.data.setIn( ['head', type], tbl.data )
+      })
+      Object.keys( tail ).forEach( type => {
+        let tbl = new Table( type, {data: tail[type], db: this} )
+        this.data = this.data.setIn( ['tail', type], tbl.data )
+      })
+      // TODO: ids
+      // TODO: diffs
+    }
   }
 
   resetHead() {
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) );
+    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
   }
 
   bindDispatch( dispatch ) {
-    this.dispatch = dispatch;
-    this.actions = bindActionCreators( modelActions, dispatch );
+    this.dispatch = dispatch
+    this.actions = bindActionCreators( modelActions, dispatch )
   }
 
   /**
@@ -172,22 +178,20 @@ export default class DB {
 
     // Replay outgoing diffs onto tail. This is to match the expectation
     // that outgoing diffs will be applied to the server.
-    for( const diff of this.data.get( 'diffs' ) ) {
+    for( const diff of this.data.get( 'diffs' ) )
       this.applyDiff( diff, false, 'tail' )
-    }
 
     // Replace head with tail.
     this.data = this.data.set( 'head', this.data.get( 'tail' ) )
 
     // Replay local diffs onto head.
-    for( const diff of localDiffs ) {
+    for( const diff of localDiffs )
       this.applyDiff( diff )
-    }
   }
 
   _updateReverseRelationships( branch = 'head' ) {
     this.data.get( branch ).forEach( (tblData, type) => {
-      let tbl = this.getTable( type, branch );
+      let tbl = this.getTable( type, branch )
       tbl.model.relationships.forEach( (relInfo, field) => {
         if( relInfo.get( 'reverse' ) )
           return;
@@ -212,33 +216,33 @@ export default class DB {
               const relObj = relTbl.get( rel.id );
               if( relObj !== undefined ) {
                 if( !tbl.model.fieldIsForeignKey( relName ) )
-                  relTbl.addRelationship( rel.id, relName, obj );
+                  relTbl.addRelationship( rel.id, relName, obj )
                 else
-                  relTbl.set( relTbl.get( rel.id ).set( relName, obj ) );
+                  relTbl.set( relTbl.get( rel.id ).set( relName, obj ) )
               }
-              this.saveTable( relTbl, branch );
+              this.saveTable( relTbl, branch )
             }
           }
-        });
-      });
-    });
+        })
+      })
+    })
   }
 
   getId( typeOrObject, id ) {
-    id = makeId( typeOrObject, id );
-    return this.data.getIn( ['ids', id._type, id.id], id );
+    id = makeId( typeOrObject, id )
+    return this.data.getIn( ['ids', id._type, id.id], id )
   }
 
   makeId( typeOrObject, id ) {
-    id = makeId( typeOrObject, id );
+    id = makeId( typeOrObject, id )
     if( id._type === undefined || id.id === undefined )
-      return id;
-    let res = this.data.getIn( ['ids', id._type, id.id] );
+      return id
+    let res = this.data.getIn( ['ids', id._type, id.id] )
     if( res === undefined ) {
-      this.data = this.data.setIn( ['ids', id._type, id.id], id );
-      res = id;
+      this.data = this.data.setIn( ['ids', id._type, id.id], id )
+      res = id
     }
-    return res;
+    return res
   }
 
   getModel( type, fail = false ) {
@@ -246,8 +250,8 @@ export default class DB {
   }
 
   getTable( type, branch = 'head' ) {
-    const data = this.data.getIn( [branch, type] );
-    return new Table( type, {data, db: this} );
+    const data = this.data.getIn( [branch, type] )
+    return new Table( type, {data, db: this} )
   }
 
   saveTable( table, branch = 'head' ) {
@@ -255,7 +259,7 @@ export default class DB {
   }
 
   toObject( data ) {
-    return this.schema.toObject( data, this );
+    return this.schema.toObject( data, this )
   }
 
   toObjects( data ) {
@@ -275,9 +279,8 @@ export default class DB {
       return undefined
     }
 
-    if( obj === undefined ) {
-      throw new ModelError( `DB: Failed to find object.` )
-    }
+    if( obj === undefined )
+      throw new ModelError( `Failed to find object: ${typeOrQuery._type}, ${typeOrQuery.id}` )
     // TODO: Should be using `obj` from above here or what?!
     return this.schema.toInstance(
       this.get( typeOrQuery, idOrQuery ),
@@ -425,9 +428,8 @@ export default class DB {
       const tailTbl = this.getTable( model.type, 'tail' )
       for( const tailObj of tailTbl.iterObjects() ) {
         const headObj = headTbl.get( tailObj.id )
-        if( headObj ) {  // ony want removals
+        if( headObj )  // ony want removals
           continue
-        }
         const diff = model.diff( tailObj, headObj )
         if( !diff ) {  // can this even happen?
           continue
@@ -578,15 +580,20 @@ export default class DB {
     this.data = this.data.set( 'tail', this.data.get( 'head' ) )
   }
 
+  createInstance( type, data ) {
+    return this.schema.createInstance( type, data, this )
+  }
+
   create( data ) {
     const model = this.getModel( data._type )
     let object = this.toObject( data )
     if( object.id === undefined )
       object = object.set( 'id', uuid.v4() )
-    const diff = model.diff( undefined, object );
+    
+    const diff = model.diff( undefined, object )
     /* this.addDiff( diff );*/
-    this.applyDiff( diff );
-    return getDiffId( diff );
+    this.applyDiff( diff )
+    return this.makeId( getDiffId( diff ) )
   }
 
   update( full, partial ) {
@@ -708,7 +715,7 @@ export default class DB {
   _applyDiffRelationships( diff, reverse=false, branch='head' ) {
     const ii = reverse ? 1 : 0;
     const jj = reverse ? 0 : 1;
-    const id = getDiffId( diff );
+    const id = this.getId( getDiffId( diff ) )
     const model = this.getModel( id._type );
     for( const field of model.iterFields() ) {
       if( diff[field] === undefined )
@@ -726,12 +733,12 @@ export default class DB {
         // M2Ms store the removals in 0 (ii), and the additions in 1 (jj).
         if( diff[field][ii] !== undefined ) {
           diff[field][ii].forEach( relId => {
-            tbl.removeRelationship( relId.id, relName, id );
+            tbl.removeRelationship( relId.id, relName, id )
           });
         }
         if( diff[field][jj] !== undefined ) {
           diff[field][jj].forEach( relId => {
-            tbl.addRelationship( relId.id, relName, id );
+            tbl.addRelationship( relId.id, relName, id )
           });
         }
       }
@@ -742,13 +749,13 @@ export default class DB {
         if( diff[field][ii] != diff[field][jj] ) {
           let relId = diff[field][ii]
           if( relId )
-            tbl.removeRelationship( relId.id, relName, id );
+            tbl.removeRelationship( relId.id, relName, id )
           relId = diff[field][jj]
           if( relId )
-            tbl.addRelationship( relId.id, relName, id );
+            tbl.addRelationship( relId.id, relName, id )
         }
       }
-      this.saveTable( tbl, branch );
+      this.saveTable( tbl, branch )
     }
   }
 
@@ -1035,6 +1042,14 @@ export default class DB {
     if( typeof trans != 'string' )
       trans = trans.name;
     this.data = this.data.deleteIn( ['transactions', trans] );
+  }
+
+  saveJson( filename ) {
+    saveJson( this.data.toJS(), filename )
+  }
+
+  loadJson( file ) {
+    return loadJson( file ).then( r => this.reset( r ) )
   }
 
   /**

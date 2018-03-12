@@ -51,10 +51,10 @@ export default class Schema {
     return new DB( data, {schema: this} )
   }
 
-  query( query ) {
+  view( view ) {
     return {
       schema: this,
-      ...query
+      ...view
     }
   }
 
@@ -84,9 +84,9 @@ export default class Schema {
     return model.toObject( data, db )
   }
 
-  createInstance( type, data ) {
+  createInstance( type, data, db ) {
     let model = this.getModel( type )
-    return new model.Instance( new Map( (data || {}) ), model )
+    return new model.Instance( new Map( (data || {}) ), model, db )
   }
 
         /* calcDiffs( state ) {
