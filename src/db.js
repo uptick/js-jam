@@ -597,12 +597,12 @@ export default class DB {
   }
 
   update( full, partial ) {
-    let existing = this.get( full._type, full.id );
+    let existing = this.get( full._type, full.id )
     if( existing === undefined )
-      throw new ModelError( 'Cannot update non-existant object.' );
-    const model = this.getModel( existing._type );
+      throw new ModelError( 'Cannot update non-existant object.' )
+    const model = this.getModel( existing._type )
 
-    let updated;
+    let updated
     if( partial !== undefined ) {
       updated = existing;
       for( const field of model.iterFields() ) {
@@ -611,7 +611,7 @@ export default class DB {
       }
     }
     else
-      updated = this.toObject( full );
+      updated = this.toObject( full )
 
     // Create a diff and add to the chain.
     const diff = model.diff( existing, updated );
@@ -704,12 +704,12 @@ export default class DB {
     this.applyDiff( diff );
   }
 
-  applyDiff( diff, reverse=false, branch='head' ) {
-    const id = getDiffId( diff );
-    let tbl = this.getTable( id._type, branch );
-    tbl.applyDiff( diff, reverse );
-    this.saveTable( tbl, branch );
-    this._applyDiffRelationships( diff, reverse, branch );
+  applyDiff( diff, reverse = false, branch = 'head' ) {
+    const id = getDiffId( diff )
+    let tbl = this.getTable( id._type, branch )
+    tbl.applyDiff( diff, reverse )
+    this.saveTable( tbl, branch )
+    this._applyDiffRelationships( diff, reverse, branch )
   }
 
   _applyDiffRelationships( diff, reverse=false, branch='head' ) {

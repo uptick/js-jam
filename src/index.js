@@ -22,3 +22,5 @@ export * from './components'
 export * from './helpers'
 
 export jamTransform from './persist'
+
+export F from './filter'

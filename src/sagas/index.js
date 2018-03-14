@@ -14,8 +14,6 @@ function* loadModelView( action ) {
     const { schema, name, props, queries } = action.payload
     yield put({ type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name} })
 
-    console.log( 'Quer: ', queries )
-
     // Load the DB from the state.
     const state = yield select()
     let db = schema.db( state.model.db )

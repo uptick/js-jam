@@ -1,12 +1,12 @@
 import { List, Map, Set, fromJS, Record } from 'immutable'
-import { ModelError } from './utils'
 
-import { getDiffId, ID, isEmpty, isObject, isRecord } from './utils'
+import { Filter, DBVisitor } from './filter'
+import { ModelError, getDiffId, ID, isEmpty, isObject, isRecord } from './utils'
 
 /**
  * Represents data of a particular type.
  */
-class Table {
+export default class Table {
 
   static filterRegex = /^([a-zA-Z](?:_?[a-zA-Z0-9]+))__([a-zA-Z](?:_?[a-zA-Z0-9]+))$/
 
@@ -87,8 +87,16 @@ class Table {
    * Filter objects based on a query.
    */
   filter( idOrQuery ) {
-    return this._filterIndices( idOrQuery )
-               .map( ii => this.data.getIn( ['objects', ii] ) )
+    if( Filter.isFilter( idOrQuery ) ) {
+      let visitor = new DBVisitor( this.db, this.type )
+      return visitor.execute( idOrQuery )
+    }
+    else
+      return this._mapIndices( this._filterIndices( idOrQuery ) )
+  }
+
+  _mapIndices( indices ) {
+    return indices.map( ii => this.data.getIn( ['objects', ii] ) )
   }
 
   /**
@@ -166,7 +174,7 @@ class Table {
             // TODO: This is a bit annoying, having to conver to a Set.
             return new Set( this.data
                                 .get( 'objects' )
-                                .map( (v, k) => (v == value) ? k : null )
+                                .map( (v, k) => (v.get( field ) == value) ? k : null )
                                 .filter( v => v !== null ) )
           }
           else {
@@ -250,9 +258,9 @@ class Table {
   _valueToIndexable( field, value ) {
     if( this.model.fieldIsForeignKey( field ) ) {
       if( value !== undefined && value !== null )
-        return value._type + '-' + value.id;
+        return value._type + '-' + value.id
     }
-    return value;
+    return value
   }
 
   _getIndex( id ) {
@@ -364,11 +372,11 @@ class Table {
     }
   }
 
-  applyDiff( diff, reverse=false ) {
-    const ii = reverse ? 1 : 0;
-    const jj = reverse ? 0 : 1;
-    const id = getDiffId( diff );
-    let obj = this.get( id.id );
+  applyDiff( diff, reverse = false ) {
+    const ii = reverse ? 1 : 0
+    const jj = reverse ? 0 : 1
+    const id = getDiffId( diff )
+    let obj = this.get( id.id )
 
     // Creation.
     if( diff._type[ii] === undefined ) {
@@ -382,23 +390,23 @@ class Table {
     // Removal.
     else if( diff._type[jj] === undefined ) {
       if( obj === undefined )
-        throw new ModelError( 'Trying to remove an object that doesn\'t exist.' );
-      this.remove( diff.id[ii] );
+        throw new ModelError( 'Trying to remove an object that doesn\'t exist.' )
+      this.remove( diff.id[ii] )
     }
 
     // Update.
     else {
       if( obj === undefined )
-        throw ModelError( 'Trying to update an object that doesn\'t exist.' );
+        throw ModelError( 'Trying to update an object that doesn\'t exist.' )
       Object.keys( diff ).forEach( x => {
-        const relInfo = this.model.relationships.get( x );
+        const relInfo = this.model.relationships.get( x )
         if( relInfo && relInfo.get( 'many' ) ) {
           diff[x][ii].forEach( y => {
             if( !obj[x].has( y ) )
-              throw new ModelError( 'Conflict while applying diff.' );
-            obj = obj.set( x, obj[x].delete( ID( y ) ) );
-          });
-          diff[x][jj].forEach( y => obj = obj.set( x, obj[x].add( ID( y ) ) ) );
+              throw new ModelError( 'Conflict while applying diff.' )
+            obj = obj.set( x, obj[x].delete( ID( y ) ) )
+          })
+          diff[x][jj].forEach( y => obj = obj.set( x, obj[x].add( ID( y ) ) ) )
         }
         else {
           if( obj[x] != diff[x][ii] ) {
@@ -407,10 +415,8 @@ class Table {
           }
           obj = obj.set( x, diff[x][jj] )
         }
-      });
-      this.set( this.db.toObject( obj ) );
+      })
+      this.set( this.db.toObject( obj ) )
     }
   }
 }
-
-export default Table;

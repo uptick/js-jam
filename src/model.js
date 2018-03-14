@@ -2,7 +2,7 @@ import { OrderedSet, Set, Record, fromJS } from 'immutable'
 import uuid from 'uuid'
 
 import { BaseInstance } from './instance'
-import { getDiffOp, toArray, ModelError } from './utils'
+import { isEmpty, getDiffOp, toArray, ModelError } from './utils'
 
 export default class Model {
 
@@ -160,7 +160,7 @@ export default class Model {
       this._makeRecord()
       this._makeInstanceSubclass()
     }
-    // TODO: Check that the fields are compatible.
+    // TODO: Check that the fields are compatible
   }
 
   update( obj, values ) {
@@ -175,7 +175,11 @@ export default class Model {
   }
 
   toObject( objData, db ) {
+
+    // Convert to an immutable record.
     let obj = new this._record( objData || {} )
+
+    // Set relationship values.
     this.relationships.forEach( (rel, name) => {
       if( rel.get( 'many' ) ) {
         let val = obj.get( name )
@@ -185,10 +189,19 @@ export default class Model {
           val.map( x => db.makeId( x ) )
         ))
       }
-      else if( obj[name] ) {
+      else if( obj[name] )
         obj = obj.set( name, db.makeId( obj[name] ) )
-      }
     })
+
+    // Perform any conversions required for field types.
+    this.attributes.forEach( (attr, name) => {
+      const value = obj[name]
+      if( isEmpty( value ) )
+        return
+      if( attr.get( 'type' ) == 'boolean' )
+        obj = obj.set( name, [true, 'true'].includes( obj[name] ) )
+    })
+
     return obj
   }
 
