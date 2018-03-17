@@ -58,6 +58,10 @@ export default class DB {
     }
   }
 
+  copy() {
+    return new DB( this.data, {schema: this.schema} )
+  }
+
   resetHead() {
     this.data = this.data.set( 'head', this.data.get( 'tail' ) )
   }
@@ -580,18 +584,16 @@ export default class DB {
     this.data = this.data.set( 'tail', this.data.get( 'head' ) )
   }
 
-  createInstance( type, data ) {
-    return this.schema.createInstance( type, data, this )
-  }
+  /* createInstance( type, data ) {
+   *   return this.getInstance( this.create({ _type: type }) )
+  * }*/
 
   create( data ) {
     const model = this.getModel( data._type )
     let object = this.toObject( data )
     if( object.id === undefined )
       object = object.set( 'id', uuid.v4() )
-    
     const diff = model.diff( undefined, object )
-    /* this.addDiff( diff );*/
     this.applyDiff( diff )
     return this.makeId( getDiffId( diff ) )
   }
@@ -736,11 +738,8 @@ export default class DB {
             tbl.removeRelationship( relId.id, relName, id )
           });
         }
-        if( diff[field][jj] !== undefined ) {
-          diff[field][jj].forEach( relId => {
-            tbl.addRelationship( relId.id, relName, id )
-          });
-        }
+        if( diff[field][jj] !== undefined )
+          diff[field][jj].forEach( relId => tbl.addRelationship( relId.id, relName, id ) )
       }
       else {
 

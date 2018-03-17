@@ -264,7 +264,10 @@ export default class Table {
   }
 
   _getIndex( id ) {
-    return this.data.getIn( ['indices', this.idField, id] ).first();
+    let index = this.data.getIn( ['indices', this.idField, id] )
+    if( index === undefined )
+      throw new ModelError( `Unknown ID in index lookup: ${id}` )
+    return index.first()
   }
 
   /**
