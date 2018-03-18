@@ -43,7 +43,7 @@ export default (options) => {
         results[name] = {
           ...content,
           loading,
-          delayLoad: props.loading,
+          delayLoad: props.loading
         }
       }
       return results
@@ -69,6 +69,11 @@ export default (options) => {
 
     class InnerComponent extends Component {
 
+      constructor( props ) {
+        super( props )
+        this.reload( props )
+      }
+
       reload( props ) {
 
         // Only trigger a reload if we've not received `loading` as
@@ -81,7 +86,7 @@ export default (options) => {
       }
 
       componentWillMount() {
-        this.reload( this.props )
+//        this.reload( this.props )
       }
 
       componentWillUnmount() {
@@ -89,8 +94,12 @@ export default (options) => {
       }
 
       componentWillReceiveProps( nextProps ) {
-        if( this.props.params != nextProps.params || (this.props.delayLoad && !nextProps.delayLoad) ) {
-          this.reload( nextProps )
+        const { name } = options
+        if( name ) {
+          const { db } = nextProps
+          const loading = nextProps[name].loading
+          if( !loading && !this.props.db.equals( nextProps.db ) )
+            this.reload( nextProps )
         }
       }
 

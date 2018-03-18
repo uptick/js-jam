@@ -2,7 +2,7 @@ import {combineReducers} from 'redux'
 
 import DB from '../db'
 import { createReducer } from './utils'
-import { flattenObject } from '../utils'
+import { flattenObject, resultsToJS } from '../utils'
 
 /**
  * Manages the state for models loaded form a server. As an example
@@ -15,9 +15,9 @@ const dbReducer = createReducer( null, {
    * Merge loaded models into the DB.
    */
   MODEL_LOAD_SUCCESS( state, action ) {
-    let db = new DB( state );
-    db.loadJsonApi( action.payload );
-    return db.data;
+    let db = new DB( state )
+    db.loadJsonApi( action.payload )
+    return db.data
   },
 
   /* MODEL_ADD_BLOCKS( state, action ) {
@@ -29,11 +29,11 @@ const dbReducer = createReducer( null, {
    * },*/
 
   MODEL_LOAD_JSON( state, action ) {
-    const {schema, jsonData} = action.payload;
-    let db = schema.db( state );
+    const {schema, jsonData} = action.payload
+    let db = schema.db( state )
     for( const data of jsonData )
-      db.loadJsonApi( data );
-    return db.data;
+      db.loadJsonApi( data )
+    return db.data
   },
 
   MODEL_SET_DB_DATA( state, action ) {
@@ -146,7 +146,7 @@ const viewReducer = createReducer({}, {
   MODEL_LOAD_VIEW_SUCCESS( state, action ) {
     const { name, results } = action.payload
     const viewState = state[name] || {}
-    console.debug( `Model: View load success: ${name}: `, results )
+    console.debug( `Model: View load success: ${name}: `, resultsToJS( results ) )
     return {
       ...state,
       [name]: {

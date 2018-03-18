@@ -32,6 +32,20 @@ export function toList( x ) {
   return new List([ x ])
 }
 
+export function toJS( x ) {
+  return x.toJS ? x.toJS() : x
+}
+
+export function resultsToJS( x ) {
+  if( x ) {
+    let y = {}
+    for( const z of Object.keys( x ) )
+      y[z] = toJS( x[z] )
+    return y
+  }
+  return x
+}
+
 export class ModelError extends Error {
   constructor( ...args ) {
     super( ...args )

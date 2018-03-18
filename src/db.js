@@ -58,6 +58,10 @@ export default class DB {
     }
   }
 
+  equals( other ) {
+    return this.data.equals( other.data )
+  }
+
   copy() {
     return new DB( this.data, {schema: this.schema} )
   }
@@ -310,9 +314,23 @@ export default class DB {
     )
   }
 
+  _sort( results, fields ) {
+    fields = toArray( fields )
+    return results.sort( ( a, b ) => {
+      for( let f of fields ) {
+        if( a[f] < b[f] ) return -1
+        if( a[f] > b[f] ) return 1
+      }
+      return 0
+    })
+  }
+
   query( options ) {
-    const { type, filter, ...other } = options
-    return this.filter( type, filter, other )
+    const { type, filter, sort, ...other } = options
+    let results = this.filter( type, filter, other )
+    if( sort )
+      results = results.then( r => this._sort( r, sort ).map( x => this.schema.toInstance( x, this ) ) )
+    return results
   }
 
   /**

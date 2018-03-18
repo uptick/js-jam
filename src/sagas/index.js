@@ -141,7 +141,7 @@ export function* mutate( schema, mutation ) {
   let state = yield select()
   let db = schema.db( state.model.db )
   mutation( db )
-  yield put( {type: 'MODEL_SET_DB_DATA', payload: db.data} )
+  yield put({ type: 'MODEL_SET_DB_DATA', payload: db.data })
 }
 
 /**
@@ -340,7 +340,8 @@ export default function* modelSaga() {
           'MODEL_COMMIT',
           'MODEL_POST_COMMIT_DIFF',
           'MODEL_LOAD_JSON',
-          'MODEL_CLEAR'
+          'MODEL_CLEAR',
+          'MODEL_SET_DB_DATA'
         ],
         mutationSerializer
       )

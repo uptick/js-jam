@@ -10,7 +10,7 @@ const jamTransform = schema => {
       try {
         if( key != 'model' || !state.db )
           return state
-        return { ...state }
+        return { db: state.db }
       }
       catch( e ) {
         console.error( e )
