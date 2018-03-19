@@ -224,9 +224,9 @@ export default class DB {
               const relObj = relTbl.get( rel.id );
               if( relObj !== undefined ) {
                 if( !tbl.model.fieldIsForeignKey( relName ) )
-                  relTbl.addRelationship( rel.id, relName, obj )
+                  relTbl.addRelationship( rel.id, relName, this.getId( obj ) )
                 else
-                  relTbl.set( relTbl.get( rel.id ).set( relName, obj ) )
+                  relTbl.set( relTbl.get( rel.id ).set( relName, this.getId( obj ) ) )
               }
               this.saveTable( relTbl, branch )
             }
@@ -315,14 +315,22 @@ export default class DB {
   }
 
   _sort( results, fields ) {
+    // TODO: Check if sort fields exist.
     fields = toArray( fields )
     return results.sort( ( a, b ) => {
       for( let f of fields ) {
-        if( a[f] < b[f] ) return -1
-        if( a[f] > b[f] ) return 1
+        const av = this._getSortValue( a, f ), bv = this._getSortValue( b, f )
+        if( av < bv ) return -1
+        if( av > bv ) return 1
       }
       return 0
     })
+  }
+
+  _getSortValue( obj, field ) {
+    for( const f of field.split( '__' ) )
+      obj = this.get( obj[f] )
+    return obj
   }
 
   query( options ) {
@@ -1066,7 +1074,11 @@ export default class DB {
   }
 
   loadJson( file ) {
-    return loadJson( file ).then( r => this.reset( r ) )
+    return loadJson( file ).then( r => {
+      this.reset( r )
+      this._updateReverseRelationships( 'head' )
+      this._updateReverseRelationships( 'tail' )
+    })
   }
 
   /**
