@@ -237,6 +237,8 @@ export default class DB {
   }
 
   getId( typeOrObject, id ) {
+    if( !typeOrObject )
+      return null
     id = makeId( typeOrObject, id )
     return this.data.getIn( ['ids', id._type, id.id], id )
   }
@@ -328,12 +330,18 @@ export default class DB {
   }
 
   _getSortValue( obj, field ) {
-    for( const f of field.split( '__' ) )
-      obj = this.get( obj[f] )
-    return obj
+    return this._lookup( obj, field.split( '__' ) )
+  }
+
+  _lookup( obj, fields ) {
+    if( fields.length > 1 )
+      for( const f of fields.slice( 0, fields.length - 1 ) )
+        obj = this.get( obj[f] )
+    return obj[fields[fields.length - 1]]
   }
 
   query( options ) {
+    console.debug( 'Query: ', options )
     const { type, filter, sort, ...other } = options
     let results = this.filter( type, filter, other )
     if( sort )
@@ -610,9 +618,9 @@ export default class DB {
     this.data = this.data.set( 'tail', this.data.get( 'head' ) )
   }
 
-  /* createInstance( type, data ) {
-   *   return this.getInstance( this.create({ _type: type }) )
-  * }*/
+  createInstance( type, data ) {
+    return this.getInstance( this.create({ _type: type, ...data }) )
+  }
 
   create( data ) {
     const model = this.getModel( data._type )
@@ -648,7 +656,6 @@ export default class DB {
       // If we wanted to keep the full diff-chain we'd add it here, but
       // for now let's just update the head.
       this.applyDiff( diff );
-      // this.addDiff( diff );
     }
   }
 

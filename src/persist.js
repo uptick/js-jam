@@ -10,7 +10,7 @@ const jamTransform = schema => {
       try {
         if( key != 'model' || !state.db )
           return state
-        return { db: state.db }
+        return { db: JSON.stringify( state.db.toJS() ) }
       }
       catch( e ) {
         console.error( e )
@@ -22,7 +22,7 @@ const jamTransform = schema => {
       try {
         if( key != 'model' || !state.db )
           return state
-        const db = new DB( state.db, {schema} )
+        const db = new DB( JSON.parse( state.db ), {schema} )
         return {
           ...state,
           db: db.data
