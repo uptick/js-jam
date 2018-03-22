@@ -8,7 +8,7 @@ import { ModelError, getDiffId, ID, isEmpty, isObject, isRecord } from './utils'
  */
 export default class Table {
 
-  static filterRegex = /^([a-zA-Z](?:_?[a-zA-Z0-9]+))__([a-zA-Z](?:_?[a-zA-Z0-9]+))$/
+  static filterRegex = /^([a-zA-Z](?:_?[a-zA-Z0-9])+)__([a-zA-Z](?:_?[a-zA-Z0-9])+)$/
 
   /**
    * `data` can be one of: a list of objects, a pre-constructed immutable
@@ -91,6 +91,8 @@ export default class Table {
       let visitor = new DBVisitor( this.db, this.type )
       return visitor.execute( idOrQuery )
     }
+    else if( !idOrQuery )
+      return this.data.get( 'objects' ).valueSeq().toArray()
     else
       return this._mapIndices( this._filterIndices( idOrQuery ) )
   }
