@@ -345,8 +345,8 @@ export default class DB {
     const { type, filter, sort, ...other } = options
     let results = this.filter( type, filter, other )
     if( sort )
-      results = results.then( r => this._sort( r, sort ).map( x => this.schema.toInstance( x, this ) ) )
-    return results
+      results = results.then( r => this._sort( r, sort ) )
+    return results.then( r => r.map( x => this.schema.toInstance( x, this ) ) )
   }
 
   /**
