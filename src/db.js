@@ -321,9 +321,10 @@ export default class DB {
     fields = toArray( fields )
     return results.sort( ( a, b ) => {
       for( let f of fields ) {
+        const d = (f[0] === '-') ? -1 : 1
         const av = this._getSortValue( a, f ), bv = this._getSortValue( b, f )
-        if( av < bv ) return -1
-        if( av > bv ) return 1
+        if( av < bv ) return -d
+        if( av > bv ) return d
       }
       return 0
     })

@@ -11,7 +11,7 @@ export function isObject( x ) {
 }
 
 export function isEmpty( x ) {
-  return x === undefined || x === null
+  return x === undefined || x === null || x === ''
 }
 
 export function toArray( x ) {
@@ -44,6 +44,10 @@ export function resultsToJS( x ) {
     return y
   }
   return x
+}
+
+export function negate( v, n ) {
+  return n ? !v : v
 }
 
 export class ModelError extends Error {

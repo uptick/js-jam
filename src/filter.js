@@ -2,6 +2,10 @@ import { Set } from 'immutable'
 
 const operations = {
 
+  not( op ) {
+    return new Filter( 'not', op )
+  },
+
   eq( field, value ) {
     return new Filter( 'eq', field, value )
   },
@@ -32,8 +36,8 @@ class Filter {
     this._r = right
   }
 
-  execute( visitor ) {
-    return visitor[this._o]( this, this._l, this._r )
+  execute( visitor, options ) {
+    return visitor[this._o]( this, this._l, this._r, options )
   }
 
   and( right ) {
@@ -54,27 +58,37 @@ class DBVisitor {
   }
 
   execute( filter ) {
-    return this.table._mapIndices( filter.execute( this, new Set() ) )
+    return this.table._mapIndices( filter.execute( this, {} ) )
   }
 
-  eq( filter, field, value ) {
+  not( filter, op, _, options ) {
+    return op.execute( this, {not: !(options || {}).not} )
+  }
+
+  eq( filter, field, value, options ) {
     if( value === null ) {  // TODO: Move this
       field = `${field}__isnull`
       value = true
     }
-    return this.table._filterIndices({ [field]: value })
+    return this.table._filterIndices({ [field]: value }, options )
   }
 
-  ['in']( filter, field, value ) {
-    return this.table._filterIndices({ [`${field}__in`]: value })
+  ['in']( filter, field, value, options ) {
+    return this.table._filterIndices({ [`${field}__in`]: value, ...options })
   }
 
-  and( filter, left, right ) {
-    return left.execute( this ).intersect( right.execute( this ) )
+  and( filter, left, right, options ) {
+    if( options.not )
+      return left.execute( this, options ).union( right.execute( this, options ) )
+    else
+      return left.execute( this ).intersect( right.execute( this ) )
   }
  
-  or( filter, left, right ) {
-    return left.execute( this ).union( right.execute( this ) )
+  or( filter, left, right, options ) {
+    if( options.not )
+      return left.execute( this, options ).intersect( right.execute( this, options ) )
+    else
+      return left.execute( this ).union( right.execute( this ) )
   }
 
 }
