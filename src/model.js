@@ -1,24 +1,26 @@
-import { OrderedSet, Set, Record, fromJS } from 'immutable'
-import uuid from 'uuid'
+import {OrderedSet, Record, fromJS} from 'immutable'
 
-import { BaseInstance } from './instance'
-import { isEmpty, getDiffOp, toArray, ModelError } from './utils'
+import {BaseInstance} from './instance'
+import {isEmpty, iterRecord, getDiffOp, ModelError} from './utils'
+import Field from './field'
 
 export default class Model {
 
-  constructor( type ) {
+  constructor(type, options) {
     this.type = type
+    if(options)
+      this.merge(options)
   }
 
   /**
    * Merge endpoint operations. Place the operations on the model
    * itself.
    */
-  merge( options ) {
+  merge(options) {
     this.idField = options.idField || 'id'
-    this.attributes = fromJS( options.attributes || {} )
-    this.relationships = fromJS( options.relationships || {} )
-    this.indices = fromJS( options.indices || ['id'] )
+    this.attributes = fromJS(options.attributes || {})
+    this.relationships = fromJS(options.relationships || {})
+    this.indices = fromJS(options.indices || ['id'])
     this.ops = {}
     this._makeRecord()
     this._makeInstanceSubclass()
@@ -26,14 +28,14 @@ export default class Model {
     // Build a list of all possible operations, then check if
     // it's been set in options.
     let operations = ['list', 'create', 'detail', 'update', 'remove', 'options']
-    for( const field of this.iterManyToMany() ) {
-      operations.push( field + 'Add' )
-      operations.push( field + 'Remove' )
+    for (const field of this.iterManyToMany()) {
+      operations.push(field + 'Add')
+      operations.push(field + 'Remove')
     }
-    for( const key of operations ) {
-      if( options.ops && key in options.ops ) {
-        this.ops[key] = (...args) => options.ops[key]( ...args ).then( data => {
-          console.debug( `Model: ${key}: `, data )
+    for (const key of operations) {
+      if (options.ops && key in options.ops) {
+        this.ops[key] = (...args) => options.ops[key](...args).then(data => {
+          console.debug(`Model: ${key}: `, data)
           return data
         })
       }
@@ -45,27 +47,26 @@ export default class Model {
       _type: undefined,
       [this.idField]: undefined
     }
-    this.attributes.forEach( (attr, name) => {
-      data[name] = attr.get( 'default' )
+    this.attributes.forEach((attr, name) => {
+      data[name] = attr.get('default')
     })
-    this.relationships.forEach( (rel, name) => {
-      data[name] = rel.get( 'many' ) ? new OrderedSet() : undefined
+    this.relationships.forEach((rel, name) => {
+      data[name] = rel.get('many') ? new OrderedSet() : undefined
     })
-    this._record = Record( data )
+    this._record = Record(data)
   }
 
   /**
    * Add attribute getters/setters to object.
    */
-  addAttributesToObject( obj ) {
-    for( const name of this.attributes.keys() ) {
-      const attr = this.attributes.get( name )
-      Object.defineProperty( obj, name, {
+  addAttributesToObject(obj) {
+    for(const name of this.attributes.keys()) {
+      Object.defineProperty(obj, name, {
         get: function() {
-          return this._values.get( name )
+          return this._values.get(name)
         },
-        set: function( x ) {
-          this._values = this._values.set( name, x )
+        set: function(x) {
+          this._values = this._values.set(name, x)
         }
       })
     }
@@ -74,34 +75,34 @@ export default class Model {
   /**
    * Add relationship getters/setters to object.
    */
-  addRelationshipsToObject( obj ) {
-    for( const name of this.relationships.keys() ) {
-      const rel = this.relationships.get( name )
-      if( rel.get( 'many' ) ) {
-        Object.defineProperty( obj, name, {
+  addRelationshipsToObject(obj) {
+    for (const name of this.relationships.keys()) {
+      const rel = this.relationships.get(name)
+      if (rel.get('many')) {
+        Object.defineProperty(obj, name, {
           get: function() {
             return {
               all: () => {
-                return (this._values.get( name ) || []).map( x =>
-                  this._db.getInstance( x )
+                return (this._values.get(name) || []).map(x =>
+                  this._db.getInstance(x)
                 )
               },
               add: x => {
-                if( rel.get( 'reverse' ) )
-                  throw new ModelError( 'Cannot set reverse relationships.' )
-                this._values = this._values.updateIn( [name], y => {
-                  return y.add( this._db.getId( x ) )
+                if (rel.get('reverse'))
+                  throw new ModelError('Cannot set reverse relationships.')
+                this._values = this._values.updateIn([name], y => {
+                  return y.add(this._db.getId(x))
                 })
               },
               remove: x => {
-                this._values = this._values.updateIn( [name], y =>
-                  y.remove( this._db.getId( x ) )
+                this._values = this._values.updateIn([name], y =>
+                  y.remove(this._db.getId(x))
                 )
               }
             }
           },
-          set: function( x ) {
-            throw ModelError( 'Cannot directly set many-to-many.' )
+          set: function(x) {
+            throw ModelError('Cannot directly set many-to-many.')
           }
         })
       }
@@ -109,30 +110,26 @@ export default class Model {
 
         // The getter for foriegn-keys will return an Instance object
         // if one exists, and undefined otherwise.
-        Object.defineProperty( obj, name, {
+        Object.defineProperty(obj, name, {
           get: function() {
-            let value = this._values.get( name )
+            let value = this._values.get(name)
 
             // Without a DB object the best we can do is return the
             // ID of the foreign-key.
-            if( !this._db ) {
+            if(!this._db)
               return value
-            }
 
             // TODO: Use db.get once I've converted it.
-            let obj = this._db.get( value )
-            if( obj ) {
-              obj = this._db.schema.toInstance( obj, this._db )
-            }
+            let obj = this._db.get(value)
+            if(obj)
+              obj = this._db.schema.toInstance(obj, this._db)
             return obj
           },
-          set: function( x ) {
-            if( x ) {
-              this._values = this._values.set( name, this._db.getId( x ) )
-            }
-            else {
-              this._values = this._values.set( name, x )
-            }
+          set: function(x) {
+            if(x)
+              this._values = this._values.set(name, this._db.getId(x))
+            else
+              this._values = this._values.set(name, x)
           }
         })
       }
@@ -150,8 +147,8 @@ export default class Model {
   _makeInstanceSubclass() {
     this.Instance = class extends BaseInstance {
     }
-    this.addAttributesToObject( this.Instance.prototype )
-    this.addRelationshipsToObject( this.Instance.prototype )
+    this.addAttributesToObject(this.Instance.prototype)
+    this.addRelationshipsToObject(this.Instance.prototype)
   }
 
   addReverseRelationship( field, relation ) {
@@ -163,54 +160,77 @@ export default class Model {
     // TODO: Check that the fields are compatible
   }
 
-  update( obj, values ) {
-    Object.keys( values ).forEach( field => {
-      obj = obj.set( field, values[field] )
-    })
+  update(rec, values) {
+    return rec.merge(this.toData(values))
+  }
+
+  toInstance(rec, db) {
+    return new this.Instance(rec, this, db)
+  }
+
+  // TODO: Rename to "toRecord"
+  toObject(data) {
+    return new this._record(this.toData(data))
+  }
+
+  // TODO: Rename to "toObject"
+  toData(data) {
+    let obj = {
+      _type: this.type,
+      id: data.id
+    }
+    for (const fldName of iterRecord(data || {})) {
+      let v = data[fldName]
+      this.switchOnField(fldName, {
+        attribute: function(fld) {
+          obj[fldName] = Field.toInternal(fld.get('type'), v)
+        },
+        foreignKey: function(fld) {
+          obj[fldName] = Field.toInternal('foreignkey', v)
+        },
+        manyToMany: function(fld) {
+          obj[fldName] = Field.toInternal('manytomany', v)
+        }
+      })
+    }
     return obj
   }
 
-  toInstance( objData, db ) {
-    return new this.Instance( objData, this, db )
+  toIndexable(fldName, value) {
+    let r
+    if (fldName == 'id') {
+      if (isEmpty(value))
+        r = null
+      else
+        r = `${value}`
+    }
+    else {
+      this.switchOnField(fldName, {
+        attribute: function(fld) {
+          r = Field.toIndexable(fld.get('type'), value)
+        },
+        foreignKey: function(fld) {
+          r = Field.toIndexable('foreignkey', value)
+        },
+        manyToMany: function(fld) {
+          r = Field.toIndexable('manytomany', value)
+        }
+      })
+    }
+    return r
   }
 
-  toObject( objData, db ) {
-
-    // Convert to an immutable record.
-    let obj = new this._record( objData || {} )
-
-    // Set relationship values.
-    this.relationships.forEach( (rel, name) => {
-      if( rel.get( 'many' ) ) {
-        let val = obj.get( name )
-        if( !OrderedSet.isOrderedSet( val ) && !Set.isSet( val ) )
-          val = toArray( val )
-        obj = obj.set( name, new OrderedSet(
-          val.map( x => db.makeId( x ) )
-        ))
-      }
-      else if( obj[name] )
-        obj = obj.set( name, db.makeId( obj[name] ) )
-    })
-
-    // Perform any conversions required for field types.
-    this.attributes.forEach( (attr, name) => {
-      const value = obj[name]
-      if( isEmpty( value ) )
-        return
-      if( attr.get( 'type' ) == 'boolean' )
-        obj = obj.set( name, [true, 'true'].includes( obj[name] ) )
-    })
-
-    return obj
-  }
-
-  *iterFields( opts ) {
+  * iterFields(opts) {
     yield '_type'
     yield 'id'
-    for( const x of this.attributes.keys() )
+    for (const x of this.attributes.keys())
       yield x
-    for( const x of this.iterRelationships( opts ) )
+    for (const x of this.iterRelationships(opts))
+      yield x
+  }
+
+  *iterAttributes() {
+    for(const x of this.attributes.keys())
       yield x
   }
 
@@ -245,6 +265,11 @@ export default class Model {
     }
   }
 
+  fieldIsAttribute(name) {
+    const fld = this.attributes.get(name)
+    return fld !== undefined
+  }
+
   fieldIsForeignKey( field ) {
     const info = this.relationships.get( field )
     if( info === undefined )
@@ -267,92 +292,142 @@ export default class Model {
     return true
   }
 
-  getField( name ) {
-    let field = this.attributes.get( name )
-    if( field === undefined ) {
-      if( !this.relationships.has( name ) ) {
-        throw new ModelError( `Model ${this.type} has no field ${name}.` )
-      }
-      field = this.relationships.get( name )
+  getField(name) {
+    let field = this.attributes.get(name)
+    if (field === undefined) {
+      if (!this.relationships.has(name))
+        throw new ModelError(`Model ${this.type} has no field ${name}.`)
+      field = this.relationships.get(name)
     }
     return field
   }
 
-  diff( fromObject, toObject ) {
+  getFieldDefault(name) {
+    const fld = this.getField(name)
+    return fld.get('default')
+  }
+
+  diff(fromObj, toObj) {
     let diff = {}
 
     // Check for creation.
-    if( fromObject === undefined ) {
-      if( toObject === undefined )
-        return
-      for( const field of this.iterFields() ) {
-        if( toObject[field] !== undefined )
-          diff[field] = [undefined, toObject[field]]
+    if (isEmpty(fromObj)) {
+      if (isEmpty(toObj))
+        return null
+      for (const fldName of this.iterFields()) {
+        if (toObj[fldName] !== undefined)
+          diff[fldName] = [undefined, toObj[fldName]]
       }
     }
 
     // Check for remove.
-    else if( toObject === undefined ) {
-      for( const field of this.iterFields() ) {
-        if( fromObject[field] !== undefined )
-          diff[field] = [fromObject[field], undefined]
+    else if (isEmpty(toObj)) {
+      for (const field of this.iterFields()) {
+        if (fromObj[field] !== undefined)
+          diff[field] = [fromObj[field], undefined]
       }
     }
 
     // Use field differences.
     else {
-      let size = 0
-      for( const field of this.iterFields() ) {
-        diff[field] = [fromObject[field], toObject[field]]
-        if( field == '_type' || field == 'id' )
-          continue
-        if( diff[field][0] == diff[field][1] )
-          delete diff[field]
-        else {
-          const relInfo = this.relationships.get( field )
-          if( relInfo ) {
-            if( diff[field][0] && diff[field][0].equals( diff[field][1] ) )
-              delete diff[field]
-            else if( relInfo && relInfo.get( 'many' ) ) {
-              size += 1
-              diff[field][0] = fromObject[field].subtract( toObject[field] )
-              diff[field][1] = toObject[field].subtract( fromObject[field] )
-            }
-            else
-              size += 1
+      for (const fldName of this.iterFields()) {
+        const f = fromObj[fldName]
+        const t = toObj[fldName]
+        let d
+        this.switchOnField(fldName, {
+          attribute: fld => {
+            d = Field.diff(fld.get('type'), f, t)
+          },
+          foreignKey: fld => {
+            d = Field.diff('foreignkey', f, t)
+          },
+          manyToMany: fld => {
+            d = Field.diff('manytomany', f, t)
           }
-          else
-            size += 1
-        }
+        })
+        if (d)
+          diff[fldName] = d
       }
-      if( !size )
-        return
+      if (Object.keys(diff).length) {
+        diff._type = [fromObj._type, toObj._type]
+        diff.id = [fromObj.id, toObj.id]
+      }
     }
 
-    return diff
+    return Object.keys(diff).length ? diff : null
   }
 
-  diffToJsonApi( diff ) {
+  applyDiff(rec, diff, reverse) {
+    if (!isEmpty(diff)) {
+      const ii = reverse ? 1 : 0
+      const jj = reverse ? 0 : 1
+
+      // Creation.
+      if (isEmpty(diff._type[ii])) {
+        if (!isEmpty(rec))
+          throw new ModelError('Trying to create an object that already exists.')
+        let data = {}
+        Object.keys(diff).forEach(x => data[x] = diff[x][jj])
+        rec = this.toObject(data)
+      }
+
+      // Removal.
+      else if (isEmpty(diff._type[jj])) {
+        if (isEmpty(rec))
+          throw new ModelError('Trying to remove an object that doesn\'t exist.')
+        rec = null
+      }
+
+      // Update.
+      else {
+        for (const fldName of Object.keys(diff)) {
+          if (['id', '_type'].includes(fldName))
+            continue
+          const v = rec.get(fldName)
+          const d = diff[fldName]
+          let r
+          this.switchOnField(fldName, {
+            attribute: fld => {
+              r = Field.applyDiff(fld.get('type'), v, d, reverse)
+            },
+            foreignKey: fld => {
+              r = Field.applyDiff('foreignkey', v, d, reverse)
+            },
+            manyToMany: fld => {
+              r = Field.applyDiff('manytomany', v, d, reverse)
+            }
+          })
+          rec = rec.set(fldName, r)
+        }
+      }
+
+    }
+    return rec
+  }
+
+  diffToJsonApi(diff) {
     let data = {
       type: diff._type[1],
       id: diff.id[1],
       attributes: {},
       relationships: {}
     }
-    const op = getDiffOp( diff )
-    if( op == 'remove' ) {
+    const op = getDiffOp(diff)
+    if (op == 'remove') {
       data.type = diff._type[0]
       data.id = diff.id[0]
     }
-    for( const field of this.attributes.keys() ) {
-      if( field in diff )
-        data.attributes[field] = diff[field][1]
+    for (const fldName of this.iterAttributes()) {
+      if (fldName in diff) {
+        const fld = this.getField(fldName)
+        data.attributes[fldName] = Field.fromInternal(fld.get('type'), diff[fldName][1])
+      }
     }
-    for( const field of this.iterForeignKeys() ) {
-      if( field in diff ) {
-        const x = diff[field][1]
-        data.relationships[field] = {
-          data: x ? {type: x._type, id: x.id} : null
+    for (const fldName of this.iterForeignKeys()) {
+      if (fldName in diff) {
+        const v = diff[fldName][1]
+        data.relationships[fldName] = {
+          data: v ? {type: v._type, id: v.id} : null
         }
       }
     }
@@ -377,7 +452,7 @@ export default class Model {
       }
     }
     if( call ) {
-      call()
+      call(info)
     }
   }
 }

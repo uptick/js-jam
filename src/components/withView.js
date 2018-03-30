@@ -25,7 +25,7 @@ export default (options) => {
 
       // Default to loading to catch that little moment before we've sent off
       // the first REQUEST action.
-      /* const { meta = {}, queries, loading = !!options.queries } = content*/
+      /* const { meta = {}, queries, loading = !!options.queries } = content */
 
       // Examine the `loading` value from our props, as it will influence
       // our loading behavior. Only flag that we're loading by default if
@@ -38,8 +38,8 @@ export default (options) => {
       // Start constructing the results. `delayLoad` is set by passing
       // in `loading` as true into our props. It indicates that any load
       // requests that come in should be ignored until `loading` is false.
-      let results = { db }
-      if( name ) {
+      let results = {db}
+      if (name) {
         results[name] = {
           ...content,
           loading,
@@ -50,13 +50,13 @@ export default (options) => {
     },
 
     dispatch => ({
-      ...bindActionCreators( modelActions, dispatch ),
+      ...bindActionCreators(modelActions, dispatch),
       ...bindActionCreators({
-        updateView: ( ...args ) => {
+        updateView: (...args) => {
           return {
             type: 'MODEL_LOAD_VIEW',
             payload: {
-              schema,
+              schema: options.schema,
               name: options.name,
               queries: (args.length == 1) ? args[0] : options.queries
             }

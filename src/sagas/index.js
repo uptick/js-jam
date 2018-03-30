@@ -1,15 +1,15 @@
-import { takeLatest } from 'redux-saga'
-import { call, apply, put, take, select } from 'redux-saga/effects'
-import { OrderedSet } from 'immutable'
+import {takeLatest} from 'redux-saga'
+import {call, apply, put, take, select} from 'redux-saga/effects'
+import {OrderedSet} from 'immutable'
 import isCallable from 'is-callable'
 
-import { makeId, getDiffId } from '../utils'
+import {makeId, getDiffId} from '../utils'
 import DB from '../db'
-import { eachInline } from './utils'
+import {eachInline} from './utils'
 
-import { changePage } from './pagination'
+import {changePage} from './pagination'
 
-function* loadModelView( action ) {
+function* loadModelView(action) {
   try {
     const { schema, name, props, queries } = action.payload
     yield put({ type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name} })
@@ -30,12 +30,12 @@ function* loadModelView( action ) {
 
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
-    for( const queryName of Object.keys( queries ) ) {
-      console.debug( `loadModelView: Looking up "${name}.${queryName}"` )
+    for (const queryName of Object.keys(queries)) {
+      console.debug(`loadModelView: Looking up "${name}.${queryName}"`)
 
       let data
       const query = queries[queryName]
-      if( isCallable( query ) )
+      if (isCallable(query))
         data = yield call( query, db, state )
       else
         data = yield call( [db, db.query], query )
@@ -102,32 +102,27 @@ function* loadModelView( action ) {
 /**
  * Synchronise the current DB against the server.
  */
-function* sync( action ) {
-  console.debug( 'Model: Sync.' )
+function * sync(action) {
+  console.debug('JAM: Synchronising.')
   const {schema} = action.payload
   try {
-    yield put( {type: 'MODEL_SYNC_REQUEST'} )
-    // yield put( {type: 'MODEL_COMMIT', payload: {schema}} )
-    /* yield commit( {schema} )*/
-    while( 1 ) {
+    yield put({type: 'MODEL_SYNC_REQUEST'})
+    while(1) {
       let state = yield select()
-      let db = schema.db( state.model.db )
-      let response = yield call( [db, db.commitDiff] )
-      if( !response ) {
+      let db = schema.db(state.model.db)
+      let rsp = yield call([db, db.commitDiff])
+      if(!rsp)
         break
-      }
-
       // I'll be the only one sending post commit diffs, so I can wait for
       // it to finish in here. If I don't wait for the post commit diff to
       // be done, we continue on and pick up the same diff again.
-      yield put( {type: 'MODEL_POST_COMMIT_DIFF', payload: {schema, response}} )
-      yield take( 'MODEL_POST_COMMIT_DIFF_DONE' )
+      yield put({type: 'MODEL_POST_COMMIT_DIFF', payload: {schema, response: rsp}})
+      yield take('MODEL_POST_COMMIT_DIFF_DONE')
     }
-    yield put( {type: 'MODEL_SYNC_SUCCESS'} )
-  }
-  catch( e ) {
-    console.error( e )
-    yield put( {type: 'MODEL_SYNC_FAILURE', errors: e.message} )
+    yield put({type: 'MODEL_SYNC_SUCCESS'})
+  } catch(e) {
+    console.error(e)
+    yield put({type: 'MODEL_SYNC_FAILURE', errors: e.message})
   }
 }
 
@@ -137,11 +132,11 @@ function* sync( action ) {
  * Each mutation retrieves the current state of the DB from the redux store, runs
  * the mutation on the state, then calls a reducer to set the new state.
  */
-export function* mutate( schema, mutation ) {
+export function * mutate(schema, mutation) {
   let state = yield select()
-  let db = schema.db( state.model.db )
-  mutation( db )
-  yield put({ type: 'MODEL_SET_DB_DATA', payload: db.data })
+  let db = schema.db(state.model.db)
+  mutation(db)
+  yield put({type: 'MODEL_SET_DB_DATA', payload: db.data})
 }
 
 /**
@@ -155,12 +150,11 @@ export function* mutate( schema, mutation ) {
  * that we may need to calcualte diffs and apply them on top, as
  * there may have been mutations in the middle.
  */
-export function* saveDB( payload ) {
+export function * saveDB(payload) {
   yield call(
     mutate,
     payload.schema,
-    db =>
-      db.data = payload.data  // TODO: Super cheeky.
+    db => db.data = payload.data // TODO: Super cheeky.
   )
 }
 
@@ -219,12 +213,11 @@ export function* commitTransaction( payload ) {
 /**
  * TODO
  */
-function* commit( payload ) {
+function * commit(payload) {
   yield call(
     mutate,
     payload.schema,
-    db =>
-      db.commit()
+    db => db.commit()
   )
 }
 
@@ -299,10 +292,10 @@ export function* mutationSerializer( action ) {
       yield call( commitTransaction, action.payload )
       break
     case 'MODEL_COMMIT':
-      yield call( commit, action.payload )
+      yield call(commit, action.payload)
       break
     case 'MODEL_POST_COMMIT_DIFF':
-      yield call( postCommitDiff, action.payload )
+      yield call(postCommitDiff, action.payload)
       break
     case 'MODEL_LOAD_JSON':
       yield call( loadJson, action.payload )
@@ -329,7 +322,7 @@ export default function* modelSaga() {
         ],
         changePage
       ),
-      eachInline( 'MODEL_SYNC', sync ),
+      eachInline('MODEL_SYNC', sync),
       eachInline(
         [
           'MODEL_SAVE_DB',

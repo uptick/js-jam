@@ -1,4 +1,4 @@
-import { List, Map, Set, Record } from 'immutable'
+import {Iterable, List, Map, Set, Record} from 'immutable'
 
 export function isIterable( x ) {
   if( x === null )
@@ -10,8 +10,12 @@ export function isObject( x ) {
   return typeof x === 'object' && x !== null
 }
 
-export function isEmpty( x ) {
-  return x === undefined || x === null || x === ''
+export function isNil(x) {
+  return x === undefined || x === null
+}
+
+export function isEmpty(x) {
+  return isNil(x) || x === ''
 }
 
 export function toArray( x ) {
@@ -20,8 +24,8 @@ export function toArray( x ) {
   return [x]
 }
 
-export function isRecord( x ) {
-  return isObject( x ) && x._map !== undefined
+export function isRecord(x) {
+  return Iterable.isIterable(x)
 }
 
 export function toList( x ) {
@@ -76,24 +80,40 @@ export const ID = Record({
   id: undefined
 })
 
-export function makeId( typeOrObj, id ) {
-  if( id === undefined )
-    return new ID( {_type: typeOrObj._type, id: typeOrObj.id} )
+export function makeId(typeOrObj, id) {
+  let r
+  if (id === undefined) {
+    if (isEmpty(typeOrObj))
+      return null
+    r = new ID({_type: typeOrObj._type, id: typeOrObj.id})
+  }
   else
-    return new ID( {_type: typeOrObj, id} )
+    r = new ID({_type: typeOrObj, id})
+  if (r._type === undefined || r.id === undefined)
+    throw new ModelError('Invalid ID: ', r.toJS())
+  return r
 }
 
-export function getDiffId( diff ) {
+export function * iterRecord(rec) {
+  if (isRecord(rec))
+    for (const k of rec)
+      yield k[0]
+  else
+    for (const k of Object.keys(rec))
+      yield k
+}
+
+export function getDiffId(diff) {
   return makeId(
     diff._type[0] || diff._type[1],
     (diff.id[0] !== undefined) ? diff.id[0] : diff.id[1]
   )
 }
 
-export function getDiffOp( diff ) {
-  if( diff._type[0] === undefined )
+export function getDiffOp(diff) {
+  if (isEmpty(diff._type[0]))
     return 'create'
-  else if( diff._type[1] === undefined )
+  else if (isEmpty(diff._type[1]))
     return 'remove'
   else
     return 'update'

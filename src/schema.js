@@ -1,19 +1,19 @@
-import { Map } from 'immutable'
+import {Map} from 'immutable'
 
 import DB from './db'
 import Model from './model'
-import { ModelError } from './utils'
+import {ModelError} from './utils'
 
 export default class Schema {
 
-  constructor( descr = {} ) {
+  constructor(descr = {}) {
     this.models = new Map()
-    this.merge( descr )
+    this.merge(descr)
   }
 
-  merge( descr = {} ) {
-    for( const type of Object.keys( descr ) ) {
-      let model = this.getModel( type )
+  merge(descr = {}) {
+    for(const type of Object.keys(descr)) {
+      let model = this.getModel(type)
       if( model === undefined ) {
         model = new Model( type )
       }

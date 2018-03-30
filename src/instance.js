@@ -17,6 +17,10 @@ import {
  */
 export class BaseInstance {
 
+  static isInstance(value) {
+    return value instanceof BaseInstance
+  }
+
   constructor( data, model, db ) {
     if( isEmpty( model ) ) {
       throw new ModelError( 'Instance: No model given.' )

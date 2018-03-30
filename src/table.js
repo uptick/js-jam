@@ -57,11 +57,17 @@ export default class Table {
     })
   }
 
+  resetIndices() {
+    this.data = this.data.set( 'indices', new Map( this.indices.toJS().map( x =>
+      [x, new Map( this._toIndexMap( this.data.get( 'objects' ) ) )]
+    ) ) )
+  }
+
   _toIndexMap( objects, key='id' ) {
     let index = new Map()
     if( !isEmpty( objects ) ) {
       objects.forEach( (item, ii) => {
-        const val = this._valueToIndexable( key, item[key] )
+        const val = this.toIndexable( key, item[key] )
         if( !index.has( val ) )
           index = index.set( val, new Set([ ii ]) )
         else
@@ -181,7 +187,7 @@ export default class Table {
                                 .filter( v => v !== null ) )
           }
           else {
-            let r = index.get( this._valueToIndexable( field, value ) )
+            let r = index.get( this.toIndexable( field, value ) )
             if( not ) {
               let r2 = new Set()
               for( let ii = 0; ii < this.data.get( 'objects' ).size; ++ii ) {
@@ -207,7 +213,7 @@ export default class Table {
      * if( index === undefined ) {
      *   throw new ModelError( `Table index not found: ${field}` )
      * }
-     * const other = index.get( this._valueToIndexable( field, value ) )*/
+     * const other = index.get( this.toIndexable( field, value ) )*/
     if( other === undefined ) {
       return new Set()
     }
@@ -231,15 +237,14 @@ export default class Table {
     // worry about adding all the indices, we'll put them in at the
     // end.
     const id = object[this.idField];
-    if( id === undefined ) {
-      throw ModelError( 'No ID given for table set.' );
-    }
+    if(isEmpty(id))
+      throw new ModelError('No ID given for "table.set".')
     const existing = this.get( {[this.idField]: id} );
     if( !existing ) {
       const size = this.data.get( 'objects' ).size;
       this.data = this.data
                       .update( 'objects', x => x.push( object ) )
-                      .setIn( ['indices', this.idField, id], new Set( [size] ) );
+                      .setIn( ['indices', this.idField, this.model.toIndexable(this.idField, id)], new Set( [size] ) );
     }
     else {
 
@@ -260,23 +265,19 @@ export default class Table {
     this.data.get( 'indices' ).forEach( (ii, field) => {
       if( field == this.idField )
         return;
-      const value = this._valueToIndexable( field, object.get( field ) );
+      const value = this.toIndexable( field, object.get( field ) );
       this.data = this.data.updateIn( ['indices', field, value], x => {
         return (x === undefined) ? new Set( [index] ) : x.add( index );
       });
     });
   }
 
-  _valueToIndexable( field, value ) {
-    if( this.model.fieldIsForeignKey( field ) ) {
-      if( value !== undefined && value !== null )
-        return value._type + '-' + value.id
-    }
-    return value
+  toIndexable(field, value) {
+    return this.model.toIndexable(field, value)
   }
 
   _getIndex( id ) {
-    let index = this.data.getIn( ['indices', this.idField, id] )
+    let index = this.data.getIn( ['indices', this.idField, this.model.toIndexable(this.idField, id)] )
     if( index === undefined )
       throw new ModelError( `Unknown ID in index lookup: ${id}` )
     return index.first()
@@ -291,7 +292,7 @@ export default class Table {
     this.data.get( 'indices' ).forEach( (ii, field) => {
       if( field == this.idField )
         return;
-      const value = this._valueToIndexable( field, object.get( field ) );
+      const value = this.toIndexable( field, object.get( field ) );
 
       // Remove the object's ID from the index.
       this.data = this.data.updateIn( ['indices', field, value], x => x.delete( index ) );
@@ -330,35 +331,40 @@ export default class Table {
    * Call a function for each related object.
    * TODO: Should use "iterRelated"?
    */
-  forEachRelatedObject( id, callback ) {
-    const obj = this.get( id );
-    const model = this.model;
-    for( const field of model.iterForeignKeys( {includeReverse: true} ) ) {
-      const relName = model.relationships.getIn( [field, 'relatedName'] );
-      if( obj[field] )
-        callback( obj[field], relName );
+  forEachRelatedObject(id, callback) {
+    const obj = this.get(id)
+    const model = this.model
+    for (const fldName of model.iterForeignKeys({includeReverse: true})) {
+      const fld = model.getField(fldName)
+      const relName = model.relationships.getIn([fldName, 'relatedName'])
+      if (obj[fldName])
+        callback(obj[fldName], relName)
     }
-    for( const field of model.iterManyToMany( {includeReverse: true} ) ) {
-      const relName = model.relationships.getIn( [field, 'relatedName'] );
-      for( const rel of obj[field] )
-        callback( rel, relName );
+    for (const fldName of model.iterManyToMany({includeReverse: true})) {
+      const fld = model.getField(fldName)
+      const relName = model.relationships.getIn([fldName, 'relatedName'])
+      for (const rel of obj[fldName])
+        callback(rel, relName)
     }
   }
 
-  addRelationship( id, field, relatedId ) {
-    const index = this._getIndex( id );
-    this.data = this.data.updateIn( ['objects', index, field], x => x.add( relatedId ) )
+  addRelationship(id, fldName, relatedId) {
+    const fld = this.model.getField(fldName)
+    if (relatedId._type != fld.get('type'))
+      throw new ModelError('Cannot add incompatible type: ', relatedId._type, ' to relationship with type: ', fld.get('type'))
+    const index = this._getIndex(id)
+    this.data = this.data.updateIn(['objects', index, fldName], x => x.add(relatedId))
   }
 
-  removeRelationship( id, field, relatedId ) {
-    const index = this._getIndex( id );
-    this.data = this.data.updateIn( ['objects', index, field], x => x.delete( relatedId ) )
+  removeRelationship(id, field, relatedId) {
+    const index = this._getIndex(id)
+    this.data = this.data.updateIn(['objects', index, field], x => x.delete(relatedId))
   }
 
   /**
    * Iterate over all objects in table.
    */
-  *iterObjects() {
+  * iterObjects() {
     for( const obj of this.data.get( 'objects' ) ) {
 
       // Need to check if empty due to the way deletes work (they
@@ -372,7 +378,7 @@ export default class Table {
   /**
    * Iterate over related object(s) for object's field.
    */
-  *iterRelated( id, field ) {
+  * iterRelated(id, field) {
     const obj = this.get( id )
     if( obj ) {
       const many = this.model.relationships.getIn( [field, 'many'] )
@@ -387,51 +393,15 @@ export default class Table {
     }
   }
 
-  applyDiff( diff, reverse = false ) {
-    const ii = reverse ? 1 : 0
-    const jj = reverse ? 0 : 1
-    const id = getDiffId( diff )
-    let obj = this.get( id.id )
-
-    // Creation.
-    if( diff._type[ii] === undefined ) {
-      if( obj !== undefined )
-        throw ModelError( 'Trying to create an object that already exists.' )
-      let newObj = {}
-      Object.keys( diff ).forEach( x => newObj[x] = diff[x][jj] )
-      this.set( this.db.toObject( newObj ) )
+  applyDiff(diff, reverse = false) {
+    const id = getDiffId(diff)
+    let rec = this.get(id.id)
+    rec = this.model.applyDiff(rec, diff, reverse)
+    if (rec === null) {
+      const ii = reverse ? 1 : 0
+      this.remove(diff.id[ii])
     }
-
-    // Removal.
-    else if( diff._type[jj] === undefined ) {
-      if( obj === undefined )
-        throw new ModelError( 'Trying to remove an object that doesn\'t exist.' )
-      this.remove( diff.id[ii] )
-    }
-
-    // Update.
-    else {
-      if( obj === undefined )
-        throw ModelError( 'Trying to update an object that doesn\'t exist.' )
-      Object.keys( diff ).forEach( x => {
-        const relInfo = this.model.relationships.get( x )
-        if( relInfo && relInfo.get( 'many' ) ) {
-          diff[x][ii].forEach( y => {
-            if( !obj[x].has( y ) )
-              throw new ModelError( 'Conflict while applying diff.' )
-            obj = obj.set( x, obj[x].delete( ID( y ) ) )
-          })
-          diff[x][jj].forEach( y => obj = obj.set( x, obj[x].add( ID( y ) ) ) )
-        }
-        else {
-          if( obj[x] != diff[x][ii] ) {
-            debugger
-            throw new ModelError( 'Conflict while applying diff.' )
-          }
-          obj = obj.set( x, diff[x][jj] )
-        }
-      })
-      this.set( this.db.toObject( obj ) )
-    }
+    else
+      this.set(rec)
   }
 }

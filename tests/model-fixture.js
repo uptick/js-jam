@@ -52,10 +52,10 @@ export function getJsonApiData( opts = {} ) {
       },
       relationships: {
         author: {
-          data: {
+          data: [{
             id: 1,
             type: 'author'
-          }
+          }]
         },
         next: {
           data: {

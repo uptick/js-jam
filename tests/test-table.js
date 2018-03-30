@@ -52,11 +52,11 @@ describe( 'Table', function() {
       assert.deepEqual( db.getId( 'author', 3 ).toJS(), {_type: 'author', id: 3} )
     })
 
-    it( 'replaces related values with mapped IDs', function() {
-      let data = splitJsonApiResponse( getJsonApiData() )
-      let tbl = new Table( 'book', {data: data.book, db} )
-      assert.equal( tbl.get( 1 ).next, db.getId( 'book', 2 ) )
-    })
+    /* it( 'replaces related values with mapped IDs', function() {
+     *   let data = splitJsonApiResponse( getJsonApiData() )
+     *   let tbl = new Table( 'book', {data: data.book, db} )
+     *   assert.equal( tbl.get( 1 ).next, db.getId( 'book', 2 ) )
+     * }) */
   })
 
   describe( 'filter', function() {

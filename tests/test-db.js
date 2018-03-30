@@ -589,45 +589,45 @@ describe( 'DB', function() {
     });
   });
 
-  describe( 'relationships', function() {
+  /* describe( 'relationships', function() {
 
-    it( 'can use JS IDs', function() {
-      let db = new DB( null, {schema} );
-      db.loadJsonApi( getJsonApiData() );
-      let obj = db.get( 'book', 3 );
-      db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 2} ) ) );
-      obj = db.get( 'book', 3 );
-      assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}, {_type: 'author', id: 2}] );
-      assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
-      assert.equal( obj.author.toList().get( 1 ), db.data.getIn( ['ids', 'author', 2] ) );
-    });
+   *   it( 'can use JS IDs', function() {
+   *     let db = new DB( null, {schema} );
+   *     db.loadJsonApi( getJsonApiData() );
+   *     let obj = db.get( 'book', 3 );
+   *     db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 2} ) ) );
+   *     obj = db.get( 'book', 3 );
+   *     assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}, {_type: 'author', id: 2}] );
+   *     assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
+   *     assert.equal( obj.author.toList().get( 1 ), db.data.getIn( ['ids', 'author', 2] ) );
+   *   });
 
-    it( 'do not duplicate IDs', function() {
-      let db = new DB( null, {schema} );
-      db.loadJsonApi( getJsonApiData() );
-      let obj = db.get( 'book', 3 );
-      db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 1} ) ) );
-      obj = db.get( 'book', 3 );
-      assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}] );
-      assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
-    });
+   *   it( 'do not duplicate IDs', function() {
+   *     let db = new DB( null, {schema} );
+   *     db.loadJsonApi( getJsonApiData() );
+   *     let obj = db.get( 'book', 3 );
+   *     db.update( obj.set( 'author', obj.get( 'author' ).add( {_type: 'author', id: 1} ) ) );
+   *     obj = db.get( 'book', 3 );
+   *     assert.deepEqual( obj.author.toJS(), [{_type: 'author', id: 1}] );
+   *     assert.equal( obj.author.toList().get( 0 ), db.data.getIn( ['ids', 'author', 1] ) );
+   *   });
 
-    it( 'convert JS IDs when adding', function() {
-      let db = new DB( null, {schema} );
-      db.loadJsonApi( getJsonApiData() );
-      let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
-      let obj = db.get( id );
-      assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
-    });
+   *   it( 'convert JS IDs when adding', function() {
+   *     let db = new DB( null, {schema} );
+   *     db.loadJsonApi( getJsonApiData() );
+   *     let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
+   *     let obj = db.get( id );
+   *     assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
+   *   });
 
-    it( '', function() {
-      let db = new DB( null, {schema} );
-      db.loadJsonApi( getJsonApiData() );
-      let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
-      let obj = db.get( id );
-      assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
-    });
-  });
+   *   it( '', function() {
+   *     let db = new DB( null, {schema} );
+   *     db.loadJsonApi( getJsonApiData() );
+   *     let id = db.create( {_type: 'book', title: 'hello', author: [{_type: 'author', id: 1}]} );
+   *     let obj = db.get( id );
+   *     assert.equal( db.data.getIn( ['ids', 'author', 1] ), obj.author.first() );
+   *   });
+   * }); */
 
   /* describe( 'calcOrderedDiffs', function() {
 

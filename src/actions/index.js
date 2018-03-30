@@ -3,21 +3,21 @@ import {createAction} from './utils'
 /**
  * Basic actions.
  */
-export const saveDB = createAction( 'MODEL_SAVE_DB' )
+export const saveDB = createAction('MODEL_SAVE_DB')
 
 /**
  * Transaction actions.
  */
-export const startTransaction = createAction( 'MODEL_START_TRANSACTION' )
-export const saveTransaction = createAction( 'MODEL_SAVE_TRANSACTION' )
-export const commitTransaction = createAction( 'MODEL_COMMIT_TRANSACTION' )
-export const abortTransaction = createAction( 'MODEL_ABORT_TRANSACTION' )
+export const startTransaction = createAction('MODEL_START_TRANSACTION')
+export const saveTransaction = createAction('MODEL_SAVE_TRANSACTION')
+export const commitTransaction = createAction('MODEL_COMMIT_TRANSACTION')
+export const abortTransaction = createAction('MODEL_ABORT_TRANSACTION')
 
 /**
  * Persistence actions.
  */
-export const commit = createAction( 'MODEL_COMMIT' )
-export const sync = createAction( 'MODEL_SYNC' )
+export const commitDB = createAction('MODEL_COMMIT')
+export const syncDB = createAction('MODEL_SYNC')
 
 /**
  * Model view actions.
