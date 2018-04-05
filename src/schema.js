@@ -6,6 +6,10 @@ import {ModelError} from './utils'
 
 export default class Schema {
 
+  static isSchema(value) {
+    return value instanceof Schema
+  }
+
   constructor(descr = {}) {
     this.models = new Map()
     this.merge(descr)
@@ -77,11 +81,11 @@ export default class Schema {
     return data.map( objData => this.toObject( objData, db ) )
   }
 
-  toObject( data, db ) {
-    const model = this.getModel( data._type )
-    if( model === undefined )
-      throw new ModelError( `Unknown model type: ${data._type}` )
-    return model.toObject( data, db )
+  toObject(data) {
+    const model = this.getModel(data._type)
+    if (model === undefined)
+      throw new ModelError(`Unknown model type: ${data._type}`)
+    return model.toObject(data)
   }
 
   createInstance( type, data, db ) {

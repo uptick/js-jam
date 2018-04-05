@@ -4,6 +4,7 @@ import {createAction} from './utils'
  * Basic actions.
  */
 export const saveDB = createAction('MODEL_SAVE_DB')
+export const rehydrateDB = createAction('MODEL_REHYDRATE')
 
 /**
  * Transaction actions.

@@ -44,14 +44,14 @@ export default class Model {
 
   _makeRecord() {
     let data = {
-      _type: undefined,
-      [this.idField]: undefined
+      _type: null,
+      [this.idField]: null
     }
     this.attributes.forEach((attr, name) => {
-      data[name] = attr.get('default')
+      data[name] = attr.get('default', null)
     })
     this.relationships.forEach((rel, name) => {
-      data[name] = rel.get('many') ? new OrderedSet() : undefined
+      data[name] = rel.get('many') ? new OrderedSet() : null
     })
     this._record = Record(data)
   }
@@ -179,21 +179,31 @@ export default class Model {
       _type: this.type,
       id: data.id
     }
-    for (const fldName of iterRecord(data || {})) {
-      let v = data[fldName]
+    for (const fldName of iterRecord(data || {}))
+      obj[fldName] = this.toInternal(fldName, data[fldName])
+    return obj
+  }
+
+  fromRecord(rec) {
+    let data = {
+      _type: this.type,
+      id: rec.id
+    }
+    for (const fldName of iterRecord(rec || {})) {
+      let v = rec[fldName]
       this.switchOnField(fldName, {
         attribute: function(fld) {
-          obj[fldName] = Field.toInternal(fld.get('type'), v)
+          data[fldName] = Field.fromInternal(fld.get('type'), v)
         },
         foreignKey: function(fld) {
-          obj[fldName] = Field.toInternal('foreignkey', v)
+          data[fldName] = Field.fromInternal('foreignkey', v)
         },
         manyToMany: function(fld) {
-          obj[fldName] = Field.toInternal('manytomany', v)
+          data[fldName] = Field.fromInternal('manytomany', v)
         }
       })
     }
-    return obj
+    return data
   }
 
   toIndexable(fldName, value) {
@@ -217,6 +227,30 @@ export default class Model {
         }
       })
     }
+    return r
+  }
+
+  toInternal(fldName, value) {
+    return this._fieldOp(fldName, type => Field.toInternal(type, value), value)
+  }
+
+  equals(fldName, a, b) {
+    return this._fieldOp(fldName, type => Field.equals(type, a, b))
+  }
+
+  _fieldOp(fldName, callback, defaultValue) {
+    let r = defaultValue
+    this.switchOnField(fldName, {
+      attribute: function(fld) {
+        r = callback(fld.get('type'))
+      },
+      foreignKey: function(fld) {
+        r = callback('foreignkey')
+      },
+      manyToMany: function(fld) {
+        r = callback('manytomany')
+      }
+    })
     return r
   }
 
@@ -300,6 +334,14 @@ export default class Model {
       field = this.relationships.get(name)
     }
     return field
+  }
+
+  getFieldType(name) {
+    const fld = this.getField(name)
+    if (this.fieldIsAttribute(name))
+      return fld.get('type')
+    else
+      return fld.get('many') ? 'manytomany' : 'foreignkey'
   }
 
   getFieldDefault(name) {

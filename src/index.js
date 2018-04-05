@@ -21,6 +21,8 @@ export * from './components'
 
 export * from './helpers'
 
-export jamTransform from './persist'
+import jamTransform from './persist'
+export {jamTransform}
 
-export F from './filter'
+import F from './filter'
+export {F}

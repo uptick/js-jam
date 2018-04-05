@@ -1,57 +1,61 @@
-var path = require( 'path' );
-var webpack = require( 'webpack' );
+let path = require('path')
+let webpack = require('webpack')
 
 module.exports = {
-  context: path.resolve( __dirname + '/..' ),
+  context: path.resolve(path.join(__dirname, '..')),
   entry: [
-    'babel-polyfill',
     './src/index'
   ],
   output: {
-    path: path.resolve( './lib/' ),
+    path: path.resolve('./lib/'),
     libraryTarget: 'umd',
     filename: 'index.js'
   },
+  plugins: [
+//    new webpack.optimize.ModuleConcatenationPlugin()
+  ],
   module: {
-    loaders: [
+    rules: [
       {
-        test: /\.jsx?$/,
+        test: /\.js$/,
         exclude: /node_modules/,
-        loaders: [ 'babel' ]
-      },
-      {
-        test: /\.styl$/,
-        loaders: [
-          'style',
-          'css',
-          'stylus'
+        use: [
+          'babel-loader'
         ]
       },
       {
-        test: /(node_modules|static)\/.*\.css$/,
-        loaders: [
-          'style',
-          'css'
+        test: /(node_modules|static|resources)\/.*\.css$/,
+        use: [
+          'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              modules: false,
+              importLoaders: 1
+            }
+          }
         ]
       },
       {
-        test: /\.css$/,
-        exclude: /(node_modules|static)\//,
-        loaders: [
-          'style',
-          'css?modules&importLoaders=1&localIdentName=[path]__[name]__[local]__[hash:base64:5]'
+        test: /\.(png|gif|jpe?g)$/i,
+        use: [
+          'file-loader?hash=sha512&digest=hex&name=[name]-[hash].[ext]'
         ]
       },
       {
-        test: /\.(woff2?|eot|ttf|svg|otf)(\?.+)?$/,
-        loaders: [
-          'url'
+        test: /\.(woff2?|eot|ttf|svg|otf)(\?.+)?$/i,
+        use: [
+          'url-loader?limit=10000&name=[name].[ext]'
         ]
       }
     ]
   },
   resolve: {
-    modulesDirectories: [ 'node_modules' ],
-    extensions: [ '', '.js', '.jsx' ]
-  }
+    modules: [
+      path.resolve(__dirname, '../src'),
+      'node_modules'
+    ],
+    extensions: ['.js', '.jsx']
+  },
+  devtool: 'cheap-module-eval-source-map'
 };

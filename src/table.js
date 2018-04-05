@@ -16,20 +16,20 @@ export default class Table {
    *
    * TODO: This is a bit inefficient given how often it will be called.
    */
-  constructor( type, options = {} ) {
-    let { data, db, idField = 'id', indices } = options
+  constructor(type, options = {}) {
+    let {data, db, idField = 'id', indices} = options
     this.type = type
     this.db = db
-    this.model = db.getModel( type, true )
+    this.model = db.getModel(type, true)
     this.idField = idField
 
     // Figure out what my indices are.
-    this.indices = new Set( indices || this.model.indices || ['id'] )
-    if( !this.indices.has( idField ) )
-      throw new ModelError( `idField: ${idField} not found in indices: ${indices}` )
+    this.indices = new Set(indices || this.model.indices || ['id'])
+    if (!this.indices.has(idField))
+      throw new ModelError(`idField: ${idField} not found in indices: ${indices}`)
 
-    if( data ) {
-      if( Array.isArray( data ) ) {
+    if (data) {
+      if (Array.isArray(data)) {
         this.data = new Map({
           objects: db.toObjects( new List( data ) ),
           indices: new Map( this.indices.toJS().map( x =>
@@ -37,12 +37,12 @@ export default class Table {
           )
         })
       }
-      else if( Map.isMap( data ) )
+      else if (Map.isMap(data))
         this.data = data
       else {
         this.data = new Map({
-          objects: db.toObjects( new List( data.objects ) ),
-          indices: fromJS( data.indices )
+          objects: db.toObjects(new List(data.objects)),
+          indices: fromJS(data.indices)
         })
       }
     }
@@ -58,9 +58,9 @@ export default class Table {
   }
 
   resetIndices() {
-    this.data = this.data.set( 'indices', new Map( this.indices.toJS().map( x =>
-      [x, new Map( this._toIndexMap( this.data.get( 'objects' ) ) )]
-    ) ) )
+    this.data = this.data.set('indices', new Map(this.indices.toJS().map(x =>
+      [x, new Map(this._toIndexMap(this.data.get('objects'), x))]
+    )))
   }
 
   _toIndexMap( objects, key='id' ) {
@@ -80,27 +80,30 @@ export default class Table {
   /**
    * Get a single object matching the query.
    */
-  get( idOrQuery ) {
-    const objects = this.filter( idOrQuery );
-    if( !objects.size )
-      return;
-    if( objects.size > 1 )
-      throw new ModelError( 'Too many objects returned in table.' );
-    return objects.first();
+  get(idOrQuery, required) {
+    const objects = this.filter(idOrQuery)
+    if (!objects.size) {
+      if (required)
+        throw new ModelError('No such object.')
+      return
+    }
+    if(objects.size > 1)
+      throw new ModelError('Too many objects returned in table.')
+    return objects.first()
   }
 
   /**
    * Filter objects based on a query.
    */
-  filter( idOrQuery ) {
-    if( Filter.isFilter( idOrQuery ) ) {
-      let visitor = new DBVisitor( this.db, this.type )
-      return visitor.execute( idOrQuery )
+  filter(idOrQuery) {
+    if (Filter.isFilter(idOrQuery)) {
+      let visitor = new DBVisitor(this.db, this.type)
+      return visitor.execute(idOrQuery)
     }
-    else if( !idOrQuery )
-      return this.data.get( 'objects' ).valueSeq().toArray()
+    else if (!idOrQuery)
+      return this.data.get('objects').valueSeq().toArray()
     else
-      return this._mapIndices( this._filterIndices( idOrQuery ) )
+      return this._mapIndices(this._filterIndices(idOrQuery))
   }
 
   _mapIndices( indices ) {
@@ -110,23 +113,22 @@ export default class Table {
   /**
    * Filter objects based on a query, returning the indices.
    */
-  _filterIndices( idOrQuery, options ) {
-    if( !isObject( idOrQuery ) ) {
-      idOrQuery = { [this.idField]: idOrQuery }
-    }
-    const { not } = options || {}
+  _filterIndices(idOrQuery, options) {
+    if (!isObject(idOrQuery))
+      idOrQuery = {[this.idField]: idOrQuery}
+    const {not} = options || {}
     let results
-    for( const field in idOrQuery ) {
-      let value = idOrQuery[field]
+    for (const field in idOrQuery) {
+      let value = this.model.toInternal(field, idOrQuery[field])
 
       // What kind of query are we looking at? If there's a double
       // underscore somewhere it's something more fancy.
-      let match = field.match( Table.filterRegex )
-      if( match !== null ) {
-        switch( match[2].toLowerCase() ) {
+      let match = field.match(Table.filterRegex)
+      if (match !== null) {
+        switch(match[2].toLowerCase()) {
 
-            // TODO: Sooo much optimisation here. These filters should be easy to
-            //  write and much more efficient.
+          // TODO: Sooo much optimisation here. These filters should be easy to
+          //  write and much more efficient.
 
           // Lookup based on a string containing a value.
           case 'contains':
@@ -135,7 +137,10 @@ export default class Table {
               // TODO: Also, what about data types? Should fail nicely if no 'includes'
               new Set( this.data
                            .get( 'objects' )
-                           .map( (v, k) => negate( v.get( match[1] ).includes( value ), not ) ? k : undefined ) // TODO: Check if field exists.
+                           .map((v, k) => {
+                             v = v.get(match[1])
+                             return negate((v !== null) ? v.includes(value) : false, not) ? k : undefined // TODO: Check if field exists.
+                           })
                            .filter( v => v !== undefined ) )
             )
             break
@@ -157,7 +162,6 @@ export default class Table {
             break
 
           case 'in':
-            value = this.db.makeId( value )
             results = this._reduceIndices( results, () =>
               // TODO: This is a bit annoying, having to conver to a Set.
               new Set( this.data
@@ -175,19 +179,18 @@ export default class Table {
       // No double slash means we can perform an exact lookup. Currently
       // this only works for fields with an index.
       else {
-        results = this._reduceIndices( results, () => {
-          const index = this.data.getIn( ['indices', field] )
-          if( index === undefined ) {
-            console.warn( `Table index not found for type "${field}", will be inefficient.` )
-            /* throw new ModelError( `Table index not found: ${field}` )*/
+        results = this._reduceIndices(results, () => {
+          const index = this.data.getIn(['indices', field])
+          if (index === undefined) {
+            console.warn(`Table index not found for type "${field}", will be inefficient.`)
             // TODO: This is a bit annoying, having to conver to a Set.
-            return new Set( this.data
-                                .get( 'objects' )
-                                .map( (v, k) => negate( v.get( field ) == value, not ) ? k : null )
-                                .filter( v => v !== null ) )
+            return new Set(this.data
+                               .get('objects')
+                               .map((v, k) => negate(this.model.equals(field, v.get(field), value), not) ? k : null)
+                               .filter(v => v !== null))
           }
           else {
-            let r = index.get( this.toIndexable( field, value ) )
+            let r = index.get(this.toIndexable(field, value))
             if( not ) {
               let r2 = new Set()
               for( let ii = 0; ii < this.data.get( 'objects' ).size; ++ii ) {
@@ -207,7 +210,7 @@ export default class Table {
   /**
    * Calculate overlapping indices based on a field/value lookup.
    */
-  _reduceIndices( indices, getOtherIndices ) {
+  _reduceIndices(indices, getOtherIndices) {
     const other = getOtherIndices()
     /* const index = this.data.getIn( ['indices', field] )
      * if( index === undefined ) {
@@ -223,53 +226,53 @@ export default class Table {
     return indices.intersect( other )
   }
 
-  set( object ) {
+  set(object) {
 
     // TODO: Must be a better way to convert to a record...
     try {
-      object.get( 'id' );
+      object.get('id')
     }
-    catch( e ) {
-      object = this.db.toObject( object );
+    catch(e) {
+      object = this.db.toObject(object)
     }
 
     // If the object doesn't exist, just add it on to the end. Don't
     // worry about adding all the indices, we'll put them in at the
     // end.
-    const id = object[this.idField];
+    const id = object[this.idField]
     if(isEmpty(id))
       throw new ModelError('No ID given for "table.set".')
-    const existing = this.get( {[this.idField]: id} );
-    if( !existing ) {
-      const size = this.data.get( 'objects' ).size;
+    const existing = this.get({[this.idField]: id})
+    if (!existing) {
+      const size = this.data.get('objects').size
       this.data = this.data
-                      .update( 'objects', x => x.push( object ) )
-                      .setIn( ['indices', this.idField, this.model.toIndexable(this.idField, id)], new Set( [size] ) );
+                      .update('objects', x => x.push(object))
+                      .setIn(['indices', this.idField, this.toIndexable(this.idField, id)], new Set([size]))
     }
     else {
 
       // Don't stomp on the existing object's ID. After a reID has been run
       // we keep around the old ID reference. Occasionally, an object may be
       // updated using the old ID, so we need to ensure we don't stomp it.
-      object = object.set( 'id', existing.id )
+      object = object.set('id', existing.id)
 
       // Eliminate the object's index from current indices and set the
       // new object.
-      const index = this._getIndex( id );
-      this._removeFromIndices( existing );
-      this.data = this.data.setIn( ['objects', index], object );
+      const index = this._getIndex(id)
+      this._removeFromIndices(existing)
+      this.data = this.data.setIn(['objects', index], object)
     }
 
     // Add indices.
-    const index = this._getIndex( id );
-    this.data.get( 'indices' ).forEach( (ii, field) => {
-      if( field == this.idField )
-        return;
-      const value = this.toIndexable( field, object.get( field ) );
-      this.data = this.data.updateIn( ['indices', field, value], x => {
-        return (x === undefined) ? new Set( [index] ) : x.add( index );
-      });
-    });
+    const index = this._getIndex(id)
+    this.data.get('indices').forEach((ii, field) => {
+      if(field == this.idField)
+        return
+      const value = this.toIndexable(field, object.get(field))
+      this.data = this.data.updateIn(['indices', field, value], x => {
+        return (x === undefined) ? new Set([index]) : x.add(index)
+      })
+    })
   }
 
   toIndexable(field, value) {
@@ -277,7 +280,7 @@ export default class Table {
   }
 
   _getIndex( id ) {
-    let index = this.data.getIn( ['indices', this.idField, this.model.toIndexable(this.idField, id)] )
+    let index = this.data.getIn( ['indices', this.idField, this.toIndexable(this.idField, id)] )
     if( index === undefined )
       throw new ModelError( `Unknown ID in index lookup: ${id}` )
     return index.first()
@@ -319,12 +322,11 @@ export default class Table {
     this.data = this.data.setIn( ['objects', index], null );
   }
 
-  reId( oldId, newId ) {
-    const index = this._getIndex( oldId );
+  reId(oldId, newId) {
+    const index = this._getIndex(oldId)
     this.data = this.data
-    /* .deleteIn( ['indices', this.idField, oldId] )*/
-                    .setIn( ['indices', this.idField, newId], new Set( [index] ) )
-                    .setIn( ['objects', index, this.idField], newId );
+                    .setIn(['indices', this.idField, this.toIndexable(this.idField, newId)], new Set([index]))
+                    .setIn(['objects', index, this.idField], newId)
   }
 
   /**
@@ -332,7 +334,7 @@ export default class Table {
    * TODO: Should use "iterRelated"?
    */
   forEachRelatedObject(id, callback) {
-    const obj = this.get(id)
+    const obj = this.get(id, true)
     const model = this.model
     for (const fldName of model.iterForeignKeys({includeReverse: true})) {
       const fld = model.getField(fldName)

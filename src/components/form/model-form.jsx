@@ -7,10 +7,10 @@ function capitalize( string ) {
   return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
-const renderField = ({instance, fieldName, component, onChange, props = {}}) => {
+const renderField = ({instance, fieldName, Component, onChange, props = {}}) => {
   const model = instance.getModel()
   const field = model.getField(fieldName)
-  let value = instance[fieldName]
+  let value = model.toForm(instance[fieldName])
   const isFK = model.fieldIsForeignKey(fieldName)
   const label = field.get('label', fieldName)
   props = {
@@ -19,7 +19,7 @@ const renderField = ({instance, fieldName, component, onChange, props = {}}) => 
     label: capitalize(label),
     value,
     onChange: x => {
-      if(isFK && x) {
+      if (isFK && x) {
         db.loadObjects(x)
       }
       instance[fieldName] = x
@@ -30,12 +30,12 @@ const renderField = ({instance, fieldName, component, onChange, props = {}}) => 
     key: fieldName,
     ...props
   }
-  if( field.get('choices', undefined ) ) {
+  if (field.get('choices', undefined)) {
     props.options = field.get('choices').toJS()
-    if( Array.isArray( props.options ) ) {
+    if (Array.isArray(props.options)) {
       props.options = props.options.map(v => ({
         value: v,
-        label: capitalize( v )
+        label: capitalize(v)
       }))
     }
     else {
@@ -45,10 +45,7 @@ const renderField = ({instance, fieldName, component, onChange, props = {}}) => 
       }))
     }
   }
-  return React.createElement(
-    component,
-    props
-  )
+  return <Component {...props} />
 }
 
 class ModelForm extends Component {

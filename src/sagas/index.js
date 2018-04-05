@@ -3,16 +3,18 @@ import {call, apply, put, take, select} from 'redux-saga/effects'
 import {OrderedSet} from 'immutable'
 import isCallable from 'is-callable'
 
-import {makeId, getDiffId} from '../utils'
+import Schema from '../schema'
+import {argopts, makeId, getDiffId} from '../utils'
 import DB from '../db'
+import {persistToLocalStorage, rehydrateFromLocalStorage} from '../persist'
 import {eachInline} from './utils'
 
 import {changePage} from './pagination'
 
-function* loadModelView(action) {
+function * loadModelView(action) {
   try {
-    const { schema, name, props, queries } = action.payload
-    yield put({ type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name} })
+    const {schema, name, props, queries} = action.payload
+    yield put({type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name}})
 
     // Load the DB from the state.
     const state = yield select()
@@ -36,10 +38,10 @@ function* loadModelView(action) {
       let data
       const query = queries[queryName]
       if (isCallable(query))
-        data = yield call( query, db, state )
+        data = yield call(query, db, state)
       else
-        data = yield call( [db, db.query], query )
-      if( data )
+        data = yield call([db, db.query], query)
+      if (data)
         results[queryName] = data
       else
         results[queryName] = null
@@ -151,10 +153,29 @@ export function * mutate(schema, mutation) {
  * there may have been mutations in the middle.
  */
 export function * saveDB(payload) {
+  const [db, opts] = argopts(payload, 'db', DB.isDB)
   yield call(
     mutate,
-    payload.schema,
-    db => db.data = payload.data // TODO: Super cheeky.
+    db.schema,
+    newDB => {
+      newDB.data = db.data // TODO: Super cheeky.
+      persistToLocalStorage({db: newDB, force: opts.force})
+    }
+  )
+
+  // If specified, commit and synchronise the database.
+  if (opts.sync)
+    yield put({type: 'MODEL_COMMIT', payload: {schema: db.schema, sync: true}})
+}
+
+export function * rehydrateDB(payload) {
+  const schema = payload
+  yield call(
+    mutate,
+    schema,
+    newDB => {
+      rehydrateFromLocalStorage(newDB)
+    }
   )
 }
 
@@ -214,24 +235,31 @@ export function* commitTransaction( payload ) {
  * TODO
  */
 function * commit(payload) {
+  const [schema, opts] = argopts(payload, 'schema', Schema.isSchema)
   yield call(
     mutate,
-    payload.schema,
+    schema,
     db => db.commit()
   )
+
+  // If specified, synchronise with the server.
+  if (opts.sync)
+    yield put({type: 'MODEL_SYNC', payload: {schema}})
 }
 
 /**
  * Mutate a DB by performing post-commit operations
  */
-function* postCommitDiff( payload ) {
+function * postCommitDiff(payload) {
   yield call(
     mutate,
     payload.schema,
-    db =>
-      db.postCommitDiff( payload.response )
+    db => {
+      let reID = db.postCommitDiff(payload.response)
+      persistToLocalStorage({db, force: reID})
+    }
   )
-  yield put( {type: 'MODEL_POST_COMMIT_DIFF_DONE', payload} )
+  yield put({type: 'MODEL_POST_COMMIT_DIFF_DONE', payload})
 }
 
 /**
@@ -274,10 +302,13 @@ function* clear( payload ) {
  * operations occur in a strictly linear fashion, and only on the same, consistent
  * view of the DB.
  */
-export function* mutationSerializer( action ) {
-  switch( action.type ) {
+export function * mutationSerializer(action) {
+  switch(action.type) {
     case 'MODEL_SAVE_DB':
-      yield call( saveDB, action.payload )
+      yield call(saveDB, action.payload)
+      break
+    case 'MODEL_REHYDRATE':
+      yield call(rehydrateDB, action.payload)
       break
     case 'MODEL_START_TRANSACTION':
       yield call( startTransaction, action.payload )
@@ -326,6 +357,7 @@ export default function* modelSaga() {
       eachInline(
         [
           'MODEL_SAVE_DB',
+          'MODEL_REHYDRATE',
           'MODEL_START_TRANSACTION',
           'MODEL_SAVE_TRANSACTION',
           'MODEL_ABORT_TRANSACTION',

@@ -119,6 +119,21 @@ export function getDiffOp(diff) {
     return 'update'
 }
 
+export function getDiffType(diff) {
+  return isEmpty(diff._type[0]) ? diff._type[1] : diff._type[0]
+}
+
+export function argopts(opts, key, check) {
+  let val
+  if (check(opts)) {
+    val = opts
+    opts = {}
+  }
+  else
+    val = opts[key]
+  return [val, opts]
+}
+
 /**
  *
  */
@@ -467,10 +482,10 @@ export function collectJsonApi( response ) {
   return models
 }
 
-export function saveJson( object, filename ) {
-  let a = document.createElement( 'a' )
-  a.setAttribute( 'href', 'data:text/plain;charset=utf-u,' + encodeURIComponent( JSON.stringify( object ) ) )
-  a.setAttribute( 'download', filename )
+export function saveJson(object, filename) {
+  let a = document.createElement('a')
+  a.setAttribute('href', 'data:text/plain;charset=utf-u,' + encodeURIComponent(JSON.stringify(object)))
+  a.setAttribute('download', filename)
   a.click()
 }
 

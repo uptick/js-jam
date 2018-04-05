@@ -1,28 +1,34 @@
 import {bindActionCreators} from 'redux'
 import uuid from 'uuid'
-import {Record, List, Map, OrderedMap, Set, OrderedSet} from 'immutable'
+import {fromJS, Record, List, Map, OrderedMap, Set, OrderedSet} from 'immutable'
 
 import Table from './table'
+import Instance from './instance'
 import {toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
         toList, Rollback, ModelError, splitJsonApiResponse, saveJson, loadJson,
         isEmpty, isRecord} from './utils'
+import {executionTime} from './debug'
 import * as modelActions from './actions'
 
 export default class DB {
 
   static Rollback = Rollback
 
+  static isDB(value) {
+    return value instanceof DB
+  }
+
   /**
    * Construct a DB from either a database data object, or a React
    * component. If using a React component, the data is assumed to
    * reside under `props.models.db`.
    */
-  constructor( data, options = {} ) {
+  constructor(data, options = {}) {
     this.schema = options.schema
-    if( Map.isMap( data ) )
+    if (Map.isMap(data))
       this.data = data
     else
-      this.reset( data )
+      this.reset(data)
   }
 
   reset(data) {
@@ -31,52 +37,48 @@ export default class DB {
       tail: new Map(),
       ids: new Map(),
       diffs: new List(),
-
-      // TODO: Deprecated?
-      chain: new Map({
-        diffs: new List(),
-        blocks: new List(),
-        current: 0,
-        server: 0
-      }),
-
+      tailptr: 0,
       transactions: new Map(),
       loads: new List(),
       objectLoads: new List()
     })
     if (data) {
-      const {head = {}, tail = {}} = data
-      Object.keys(head).forEach(type => {
-        let tbl = new Table(type, {data: head[type], db: this})
-        this.data = this.data.setIn(['head', type], tbl.data)
-      })
-      Object.keys(tail).forEach(type => {
-        let tbl = new Table(type, {data: tail[type], db: this})
-        this.data = this.data.setIn(['tail', type], tbl.data)
-      })
-      this.resetIndices()
-      // TODO: ids?
-      this.data = this.data.set('diffs', new List(data.diffs))
+      if (data.tail) {
+        Object.keys(data.tail).forEach(type => {
+          let tbl = new Table(type, {data: data.tail[type], db: this})
+          this.data = this.data.setIn(['tail', type], tbl.data)
+        })
+      }
+      this.data = this.data.set('diffs', new List(data.diffs || []))
+      this.data = this.data.set('tailptr', data.tailptr || 0)
+      this.resetIndices('tail')
+      this.resetHead()
     }
-  }
-
-  equals( other ) {
-    return this.data.equals( other.data )
-  }
-
-  copy() {
-    return new DB( this.data, {schema: this.schema} )
   }
 
   resetHead() {
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
+    this.data = this.data.set('head', this.data.get('tail'))
+    const tp = this.data.get('tailptr')
+    for (const diff of this.data.get('diffs').slice(tp))
+      this.applyDiff(diff)
   }
 
-  resetIndices() {
-    for( const tbl of this.iterTables() ) {
+  resetIndices(branch = 'head') {
+    for (const tbl of this.iterTables(branch)) {
       tbl.resetIndices()
-      this.saveTable( tbl )
+      this.saveTable(tbl, branch)
     }
+  }
+
+  equals(other) {
+    // TODO: Store diffs as immutable. Ugh, this is baaaad.
+    return this.data
+               .update('diffs', x => fromJS(x.toJS()))
+               .equals(other.data.update('diffs', x => fromJS(x.toJS())))
+  }
+
+  copy() {
+    return new DB(this.data, {schema: this.schema})
   }
 
   bindDispatch( dispatch ) {
@@ -103,18 +105,18 @@ export default class DB {
 
     // Clear head and tail.
     this.data = this.data
-                    .set( 'head', new Map() )
-                    .set( 'tail', new Map() )
+                    .set('head', new Map())
+                    .set('tail', new Map())
 
     // Re-insert the outgoing objects.
     outgoing.forEach(
       obj => {
-        let tbl = this.getTable( obj._type, 'tail' )
-        tbl.set( obj )
-        this.saveTable( tbl, 'tail' )
+        let tbl = this.getTable(obj._type, 'tail')
+        tbl.set(obj)
+        this.saveTable(tbl, 'tail')
       }
     )
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
+    this.data = this.data.set('head', this.data.get('tail'))
   }
 
   /**
@@ -290,38 +292,38 @@ export default class DB {
     return new Table( type, {data, db: this} )
   }
 
-  *iterTables() {
-    for( const [type, data] of this.data.get( 'head' ) )
-      yield new Table( type, {data, db: this} )
+  *iterTables(branch = 'head') {
+    for (const [type, data] of this.data.get(branch))
+      yield new Table(type, {data, db: this})
   }
 
   saveTable( table, branch = 'head' ) {
     this.data = this.data.setIn( [branch, table.type], table.data );
   }
 
-  toObject( data ) {
-    return this.schema.toObject( data, this )
+  toObject(data) {
+    return this.schema.toObject(data)
   }
 
   toObjects( data ) {
     return this.schema.toObjects( data, this );
   }
 
-  getInstance( typeOrQuery, idOrQuery ) {
+  getInstance(typeOrQuery, idOrQuery) {
 
     // Don't flip out if the model doesn't exist.
     let obj
     try {
-      obj = this.get( typeOrQuery, idOrQuery );
+      obj = this.get(typeOrQuery, idOrQuery)
     }
-    catch( e ) {
+    catch(e) {
       // TODO: Catch specific error.
-      console.warn( e );
+      console.warn(e)
       return undefined
     }
 
-    if( obj === undefined )
-      throw new ModelError( `Failed to find object: ${typeOrQuery._type}, ${typeOrQuery.id}` )
+    if (obj === undefined)
+      throw new ModelError(`Failed to find object: ${typeOrQuery._type}, ${typeOrQuery.id}`)
     // TODO: Should be using `obj` from above here or what?!
     return this.schema.toInstance(
       this.get( typeOrQuery, idOrQuery ),
@@ -373,12 +375,14 @@ export default class DB {
   }
 
   query( options ) {
-    console.debug( 'Query: ', options )
-    const { type, filter, sort, ...other } = options
-    let results = this.filter( type, filter, other )
-    if( sort )
-      results = results.then( r => this._sort( r, sort ) )
-    return results.then( r => r.map( x => this.schema.toInstance( x, this ) ) )
+    console.debug('Query: ', options)
+    return executionTime(() => {
+      const {type, filter, sort, ...other} = options
+      let results = this.filter( type, filter, other )
+      if( sort )
+        results = results.then( r => this._sort( r, sort ) )
+      return results.then( r => r.map( x => this.schema.toInstance( x, this ) ) )
+    })
   }
 
   /**
@@ -387,13 +391,13 @@ export default class DB {
    * get( '', 3 )
    * get( '', {key: } )
    */
-  get( typeOrQuery, idOrQuery ) {
+  get(typeOrQuery, idOrQuery) {
     let query, type
-    if( idOrQuery === undefined ) {
-      if( typeOrQuery === undefined )
+    if (isEmpty(idOrQuery)) {
+      if (isEmpty(typeOrQuery))
         return
       type = typeOrQuery._type
-      if (isRecord(typeOrQuery))
+      if (Instance.isInstance(typeOrQuery) || isRecord(typeOrQuery))
         query = {id: typeOrQuery.id}
       else {
         const {_type: x, ...y} = typeOrQuery
@@ -430,54 +434,23 @@ export default class DB {
     }
   }
 
-  /**
-   * Begin an atomic transaction.
-   */
-  withBlock( operation ) {
-    if( this._inBlock )
-      throw ModelError( 'Already in DB block.' );
-    const chain = this.data.get( 'chain' );
-    const current = chain.get( 'current' );
-    try {
-      operation();
-      if( this.data.getIn( ['chain', 'current'] ) != current )
-        this.data = this.data.updateIn( ['chain', 'blocks'], x => x.push( current ) );
-      this._inBlock = false;
-    }
-    catch( err ) {
-      this.goto( current );
-      this.data = this.data.set( 'chain', chain );
-      this._inBlock = false;
-      if( !(err instanceof Rollback) )
-        throw err;
-    }
+  getDiffs2() {
+    return this.data.get('diffs')
   }
 
-  getBlock( index ) {
-    const blocks = this.data.getIn( ['chain', 'blocks'] );
-    const diffs = this.data.getIn( ['chain', 'diffs'] );
-    if( index === undefined )
-      index = 0;
-    if( !blocks.size || index >= blocks.size )
-      return [];
-    const start = blocks.get( blocks.size - index - 1 );
-    const finish = blocks.get( blocks.size - index );
-    return diffs.slice( start, finish );
+  getTailPointer() {
+    return this.data.get('tailptr')
   }
 
-  getBlocks( nBlocks ) {
-    let blocks = [];
-    for( let ii = 0; ii < nBlocks; ++ii )
-      blocks.push( this.getBlock( nBlocks - ii - 1 ) );
-    return blocks;
-  }
-
+  // TODO: Rename to "makeDiffs"
   getDiffs() {
     let diffs = []
     let tbl = this._makeDependencyTable()
     let id = this._getNextReady(tbl)
     while(id) {
+      console.log('ID:', id)
       if (tbl[id].optional.size > 0) {
+        console.log('GOT SOME OPTIONALS')
         const [mainDiff, auxDiff] = this._splitDiff(tbl[id])
         diffs.push(mainDiff)
         tbl[id].diff = auxDiff
@@ -485,6 +458,7 @@ export default class DB {
         tbl[id].optional = new Set()
       }
       else {
+        console.log('NO OPTIONAL')
         diffs.push(tbl[id].diff)
         delete tbl[id]
       }
@@ -509,40 +483,41 @@ export default class DB {
     return diffs
   }
 
-  _splitDiff( info ) {
-    const {diff, optional} = info;
-    let auxDiff = {};
-    const model = this.getModel( diff._type[1] );
-    for( const fieldName of model.iterRelationships() ) {
-      if( !(fieldName in diff) )
-        continue;
-      const field = model.getField( fieldName );
-      if( field.get( 'many' ) ) {
+  _splitDiff(info) {
+    const {diff, optional} = info
+    let auxDiff = {}
+    const model = this.getModel(diff._type[1])
+    for (const fieldName of model.iterRelationships()) {
+      if (!(fieldName in diff))
+        continue
+      const field = model.getField(fieldName)
+      if (field.get('many')) {
         auxDiff[fieldName] = [
-          diff[fieldName][0].filter( x => !optional.has( x ) ),
-          diff[fieldName][1].filter( x => !optional.has( x ) )
-        ];
+          diff[fieldName][0].filter(x => !optional.has(x)),
+          diff[fieldName][1].filter(x => !optional.has(x))
+        ]
         diff[fieldName] = [
-          diff[fieldName][0].filter( x => optional.has( x ) ),
-          diff[fieldName][1].filter( x => optional.has( x ) )
-        ];
+          diff[fieldName][0].filter(x => optional.has(x)),
+          diff[fieldName][1].filter(x => optional.has(x))
+        ]
       }
       else {
-        if( diff[fieldName][1] == id ) {
-          auxDiff[fieldName] = diff[fieldName];
-          delete diff[fieldName];
+        //        if (!isEmpty(diff[fieldName][1]) {
+        if (optional.has(diff[fieldName][1])) {
+          auxDiff[fieldName] = diff[fieldName]
+          delete diff[fieldName]
         }
       }
     }
-    return [diff, auxDiff];
+    return [diff, auxDiff]
   }
 
   _makeDependencyTable() {
     let tbl = {}
-    this.schema.models.map( (model, type) => {
-      const headTbl = this.getTable( model.type, 'head' );
-      const tailTbl = this.getTable( model.type, 'tail' );
-      for( const headObj of headTbl.iterObjects() ) {
+    this.schema.models.map((model, type) => {
+      const headTbl = this.getTable(model.type, 'head')
+      const tailTbl = this.getTable(model.type, 'tail')
+      for (const headObj of headTbl.iterObjects()) {
         const tailObj = tailTbl.get(headObj.id)
         const diff = model.diff(tailObj, headObj)
         if (!diff)
@@ -555,19 +530,21 @@ export default class DB {
           required: new Set(),
           optional: new Set()
         }
-        for( const fieldName of model.iterRelationships() ) {
-          const field = model.getField( fieldName );
-          if( diff[fieldName] === undefined )
-            continue;
-          let related = diff[fieldName][1];
-          if( !field.get( 'many' ) )
-            related = [related];
-          for( const relId of related ) {
+        for (const fieldName of model.iterRelationships()) {
+          const field = model.getField(fieldName)
+          if (diff[fieldName] === undefined)
+            continue
+          let related = diff[fieldName][1]
+          if (isEmpty(related))
+            continue
+          if (!field.get('many'))
+            related = [related]
+          for (const relId of related) {
             // TODO: Why would relId be null?
             if (isEmpty(relId) || this.exists(relId, 'tail'))
               continue
-            let kind = field.get( 'required' ) ? 'required' : 'optional';
-            tbl[tblId][kind] = tbl[tblId][kind].add( relId );
+            let kind = field.get('required') ? 'required' : 'optional'
+            tbl[tblId][kind] = tbl[tblId][kind].add(relId)
           }
         }
       }
@@ -575,27 +552,36 @@ export default class DB {
     return tbl;
   }
 
-  _getNextReady( tbl ) {
-    let next;
-    for( const id of Object.keys( tbl ) ) {
-      if( tbl[id].required.size == 0 ) {
-        if( next !== undefined ) {
-          if( tbl[id].optional.size < tbl[next].optional.size )
-            next = id;
+  _getNextReady(tbl) {
+    let next
+    for (const id of Object.keys(tbl)) {
+      console.log(tbl[id], tbl[id].required.toJS())
+      if (tbl[id].required.size == 0) {
+        if (next !== undefined) {
+          if (tbl[id].optional.size < tbl[next].optional.size)
+            next = id
         }
         else
-          next = id;
+          next = id
       }
-      if( next !== undefined && tbl[next].optional.size == 0 )
-        break;
+      if (next !== undefined && tbl[next].optional.size == 0)
+        break
     }
-    for( const id of Object.keys( tbl ) ) {
-      tbl[id].required = tbl[id].required.remove( tbl[next].id );
-      tbl[id].optional = tbl[id].optional.remove( tbl[next].id );
+    console.log('NEXT:', next)
+    for (const id of Object.keys(tbl)) {
+      tbl[id].required = tbl[id].required.remove(tbl[next].id)
+      tbl[id].optional = tbl[id].optional.remove(tbl[next].id)
     }
-    return next;
+    return next
   }
 
+  /**
+   * Commit the current head.
+   *
+   * Once a head state is ready to be considered permanent, it should be
+   * committed. This compacts the existing diffs and sets the tail
+   * of the DB to be the head.
+   */
   commit() {
     let diffs = this.getDiffs()
 
@@ -628,23 +614,33 @@ export default class DB {
 
       // Only add the original diff if it either does not exist in the
       // tail, or has attributes to be set.
-      if( !this.exists( getDiffId( diff ), 'tail' ) || Object.keys( diff ).length > 2 )
-        newDiffs.push( diff )
+      if (!this.exists(getDiffId(diff), 'tail') || Object.keys(diff).length > 2)
+        newDiffs.push(diff)
 
-      for( const d of extraDiffs )
-        newDiffs.push( d )
+      for(const d of extraDiffs)
+        newDiffs.push(d)
     }
 
-    // Store the resulting diffs on top of existing ones.
-    console.debug( `DB: Committing ${newDiffs.length} new diff(s)` )
-    this.data = this.data.update( 'diffs', x => x.concat( newDiffs ) )
+    // The new diffs need to be inserted after the diffs corresponding
+    // to the current tail pointer. The diffs after the tail pointer
+    // should be discarded, as the new diffs represent the compacted
+    // version of those. The tail pointer should also be updated to
+    // the new location.
+    console.debug(`DB: Committing ${newDiffs.length} new diff(s)`)
+    const tp = this.data.get('tailptr')
+    this.data = this.data.update('diffs', x => x.slice(0, tp).concat(newDiffs))
+    this.data = this.data.update('tailptr', x => x + newDiffs.length)
 
     // Reset tail to head.
-    this.data = this.data.set( 'tail', this.data.get( 'head' ) )
+    this.data = this.data.set('tail', this.data.get('head'))
   }
 
-  createInstance( type, data ) {
-    return this.getInstance( this.create({ _type: type, ...data }) )
+  createInstance(type, data) {
+    return this.getInstance(this.create({ _type: type, ...data }))
+  }
+
+  create2(type, data) {
+    return this.create({_type: type, ...data})
   }
 
   create(data) {
@@ -654,20 +650,21 @@ export default class DB {
       object = object.set('id', uuid.v4())
     const diff = model.diff(undefined, object)
     this.applyDiff(diff)
-    return this.makeId(getDiffId(diff))
+    this.data = this.data.update('diffs', x => x.push(diff))
+    return object
   }
 
   update(full, partial) {
     let existing = this.get(full._type, full.id)
-    if( existing === undefined )
+    if (existing === undefined)
       throw new ModelError('Cannot update non-existant object.')
     const model = this.getModel(existing._type)
 
     let updated
-    if(partial !== undefined) {
+    if (partial !== undefined) {
       updated = existing
       for (const field of model.iterFields()) {
-        if(field in partial)
+        if (field in partial)
           updated = updated.set(field, partial[field])
       }
     }
@@ -676,7 +673,8 @@ export default class DB {
 
     // Create a diff and add to the chain.
     const diff = model.diff( existing, updated );
-    if( diff ) {
+    if (diff) {
+      this.data = this.data.update('diffs', x => x.push(diff))
 
       // If we wanted to keep the full diff-chain we'd add it here, but
       // for now let's just update the head.
@@ -685,10 +683,10 @@ export default class DB {
   }
 
   createOrUpdate( obj ) {
-    if( this.get({ _type: obj._type, id: obj.id }) === undefined )
-      return this.create( obj )
+    if (this.get({_type: obj._type, id: obj.id}) === undefined)
+      return this.create(obj)
     else
-      return this.update( obj )
+      return this.update(obj)
   }
 
   /* getOrCreate( type, query ) {
@@ -698,70 +696,20 @@ export default class DB {
      return obj;
      } */
 
-  remove( typeOrObject, id ) {
-    let type;
-    if( id === undefined ) {
-      type = typeOrObject._type;
-      id = typeOrObject.id;
+  remove(typeOrObject, id) {
+    let type
+    if (id === undefined) {
+      type = typeOrObject._type
+      id = typeOrObject.id
     }
     else
-      type = typeOrObject;
-    const model = this.getModel( type );
-    let object = this.get( type, id );
-    id = this.getId( object );
-    const diff = model.diff( object, undefined );
-    this.applyDiff( diff );
-  }
-
-  undoAll() {
-    let current = this.data.getIn( ['chain', 'current'] );
-    while( current ) {
-      this.undo();
-      current -= 1;
-    }
-  }
-
-  undo() {
-    const diffs = this.data.getIn( ['chain', 'diffs'] );
-    const current = this.data.getIn( ['chain', 'current'] );
-    if( !current )
-      return;
-    let diff = diffs.get( current - 1 );
-    this.applyDiff( diff, true );
-    this.data = this.data.setIn( ['chain', 'current'], current - 1 );
-  }
-
-  redoAll() {
-    let current = this.data.getIn( ['chain', 'current'] );
-    const diffs = this.data.getIn( ['chain', 'diffs'] );
-    while( current < diffs.size ) {
-      this.redo();
-      current += 1;
-    }
-  }
-
-  redo() {
-    const diffs = this.data.getIn( ['chain', 'diffs'] );
-    const current = this.data.getIn( ['chain', 'current'] );
-    if( current == diffs.size )
-      return;
-    let diff = diffs.get( current );
-    this.applyDiff( diff );
-    this.data = this.data.setIn( ['chain', 'current'], current + 1 );
-  }
-
-  addBlock( block ) {
-    const offset = this.data.getIn( ['chain', 'diffs'] ).size;
-    for( const diff of block )
-      this.addDiff( diff );
-    this.data = this.data.updateIn( ['chain', 'blocks'], x => x.push( offset ) );
-  }
-
-  addDiff( diff ) {
-    this.data = this.data
-                    .updateIn( ['chain', 'diffs'], x => x.push( diff ) )
-                    .updateIn( ['chain', 'current'], x => x + 1 );
-    this.applyDiff( diff );
+      type = typeOrObject
+    const model = this.getModel(type)
+    let object = this.get(type, id)
+    id = this.getId(object)
+    const diff = model.diff(object, undefined)
+    this.applyDiff(diff)
+    this.data = this.data.update('diffs', x => x.push(diff))
   }
 
   applyDiff(diff, reverse = false, branch = 'head') {
@@ -813,26 +761,6 @@ export default class DB {
         }
       }
       this.saveTable( tbl, branch )
-    }
-  }
-
-  /**
-   * Move current diff location to `index`.
-   */
-  goto( index ) {
-    const diffs = this.data.getIn( ['chain', 'diffs'] );
-    const current = this.data.getIn( ['chain', 'current'] );
-    if( index > diffs.size )
-      throw ValueError( 'Cannot goto index greater than number of diffs.' );
-    if( index < 0 )
-      throw ValueError( 'Cannot goto negative index.' );
-    while( index < current ) {
-      this.undo();
-      index += 1;
-    }
-    while( index > current ) {
-      this.redo();
-      index -= 1;
     }
   }
 
@@ -924,24 +852,27 @@ export default class DB {
     return promise;
   }
 
-  postCommitDiff( response, diff ) {
-    if( !diff ) {
-      diff = this.data.getIn( ['diffs', 0] );
+  postCommitDiff(response, diff) {
+    return executionTime(() => {
 
-      // Remove the first diff in the chain.
-      this.data = this.data.update( 'diffs', x => x.shift() );
-    }
+      // If no diff was supplied, operate on the first in the queue,
+      // including unshifting it and updating the tail pointer.
+      if (!diff) {
+        diff = this.data.getIn(['diffs', 0])
+        this.data = this.data.update('diffs', x => x.shift())
+        this.data = this.data.update('tailptr', x => x -= 1)
+      }
 
-    // If we've created an object, perform a reId.
-    if( getDiffOp( diff ) == 'create' ) {
-      const {data} = response;
-      const id = toArray( data )[0].id;
-      this.reId( diff._type[1], diff.id[1], id );
-    }
-  }
+      // If we've created an object, perform a reId.
+      if (getDiffOp(diff) == 'create') {
+        const {data} = response
+        const id = toArray(data)[0].id
+        this.reId(diff._type[1], diff.id[1], id)
+        return true
+      }
 
-  popDiff() {
-    this.data = this.data.updateIn( ['chain', 'server'], x => x + 1 );
+      return false
+    }, 'postCommitDiff')
   }
 
   /**
@@ -953,7 +884,7 @@ export default class DB {
    * NOTE: We can't remove the old ID straight away, as there are cases
    *       where other components still need to reference it.
    */
-  reId( type, id, newId, branch ) {
+  reId(type, id, newId, branch) {
     console.debug(`DB: reId: New ID for ${type}, ${id}: ${newId}`)
 
     // If no branch was given, do both.
@@ -1052,11 +983,6 @@ export default class DB {
       // way when we calculate diffs we'll get only the difference
       // between the main head and our transaction head.
       tail: this.data.get( 'head' ),
-
-      chain: new Map({
-        diffs: new List(),
-        current: 0
-      })
     });
     this.data = this.data.setIn( ['transactions', name], data );
     return this.getTransaction( name );
@@ -1097,13 +1023,17 @@ export default class DB {
     this.data = this.data.deleteIn( ['transactions', trans] );
   }
 
-  saveJson( filename ) {
-    saveJson( this.data.toJS(), filename )
+  saveJson(filename) {
+    saveJson(this.data.toJS(), filename)
   }
 
   loadJson(file) {
     return loadJson(file).then(r => {
+      r.tail = r.head
+      r.head = {}
       this.reset(r)
+      this.data = this.data.set('head', this.data.get('tail'))
+      this.data = this.data.set('tail', new Map())
       this._updateReverseRelationships('head')
       this._updateReverseRelationships('tail')
     })

@@ -1,6 +1,6 @@
-import React, { Component } from 'react'
-import { bindActionCreators } from 'redux'
-import { connect } from 'react-redux'
+import React from 'react'
+import {bindActionCreators} from 'redux'
+import {connect} from 'react-redux'
 
 import * as modelActions from '../actions'
 import DB from '../db'
@@ -9,7 +9,7 @@ import DB from '../db'
  * Higher-order component to automatically insert models loaded
  * from a server.
  */
-export default (options) => {
+export default options => {
 
   /**
    * Connect the wrapper component to the model state.
@@ -67,7 +67,7 @@ export default (options) => {
 
   )(
 
-    class InnerComponent extends Component {
+    class InnerComponent extends React.Component {
 
       constructor( props ) {
         super( props )
@@ -93,13 +93,34 @@ export default (options) => {
         this.props.clearModelView( options )
       }
 
-      componentWillReceiveProps( nextProps ) {
-        const { name } = options
-        if( name ) {
-          const { db } = nextProps
+      /**
+       * Reload the database when things have changed.
+       *
+       * The triggers for reloading the database are:
+       *
+       *   * any part of our local database cache has changed, or
+       *   * we are not currently loading.
+       *
+       * These ensure if a load request was made manually, so long as
+       * we're not already performing a load it will be respected, and
+       * if new information is in our database it will respond to those
+       * changes, and it will also stop infinite loading from occurring.
+       *
+       * TODO: I want to minimise these loads, so three things can be done.
+       *   First I can maybe use a selector to limit the database
+       *   comparison, making sure it only reloads when something
+       *   relevant has changed. Secondly, I could try and coalesce the
+       *   requests for reloading. Lastly, when the local DB is all
+       *   that's changed (i.e. we're still loading) I can queue up a
+       *   a local reload only.
+       */
+      componentWillReceiveProps(nextProps) {
+        const {name} = options
+        if(name) {
           const loading = nextProps[name].loading
-          if( !loading && !this.props.db.equals( nextProps.db ) )
-            this.reload( nextProps )
+          // if(!loading || !this.props.db.equals(nextProps.db))
+          if(!this.props.db.equals(nextProps.db))
+            this.reload(nextProps)
         }
       }
 
