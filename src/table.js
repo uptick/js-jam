@@ -53,7 +53,7 @@ export default class Table {
   reset() {
     this.data = new Map({
       objects: new List(),
-      indices: new Map( this.indices.toJS().map( x => [x, new Map()] ) )
+      indices: new Map(this.indices.toJS().map(x => [x, new Map()]))
     })
   }
 
@@ -63,15 +63,15 @@ export default class Table {
     )))
   }
 
-  _toIndexMap( objects, key='id' ) {
+  _toIndexMap(objects, key = 'id') {
     let index = new Map()
-    if( !isEmpty( objects ) ) {
-      objects.forEach( (item, ii) => {
-        const val = this.toIndexable( key, item[key] )
-        if( !index.has( val ) )
-          index = index.set( val, new Set([ ii ]) )
+    if (!isEmpty(objects)) {
+      objects.forEach((item, ii) => {
+        const val = this.toIndexable(key, item[key])
+        if (!index.has(val))
+          index = index.set(val, new Set([ii]))
         else
-          index = index.updateIn([ val ], x => x.add( ii ))
+          index = index.updateIn([val], x => x.add(ii))
       })
     }
     return index
@@ -282,10 +282,10 @@ export default class Table {
     return this.model.toIndexable(field, value)
   }
 
-  _getIndex( id ) {
-    let index = this.data.getIn( ['indices', this.idField, this.toIndexable(this.idField, id)] )
-    if( index === undefined )
-      throw new ModelError( `Unknown ID in index lookup: ${id}` )
+  _getIndex(id) {
+    let index = this.data.getIn(['indices', this.idField, this.toIndexable(this.idField, id)])
+    if(index === undefined)
+      throw new ModelError(`Unknown ID in index lookup for type "${this.model.type}" and ID "${id}"`)
     return index.first()
   }
 
