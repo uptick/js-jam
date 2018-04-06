@@ -106,8 +106,11 @@ export default class Table {
       return this._mapIndices(this._filterIndices(idOrQuery))
   }
 
-  _mapIndices( indices ) {
-    return indices.map( ii => this.data.getIn( ['objects', ii] ) )
+  /**
+   * Convert a set of indices to records.
+   */
+  _mapIndices(indices) {
+    return indices.map(ii => this.data.getIn(['objects', ii]))
   }
 
   /**

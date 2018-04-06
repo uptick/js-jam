@@ -4,6 +4,7 @@ import {fromJS, Record, List, Map, OrderedMap, Set, OrderedSet} from 'immutable'
 
 import Table from './table'
 import Instance from './instance'
+import {Filter} from './filter'
 import {toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
         toList, Rollback, ModelError, splitJsonApiResponse, saveJson, loadJson,
         isEmpty, isRecord} from './utils'
@@ -122,18 +123,17 @@ export default class DB {
   /**
    * Load models from JSON API format.
    */
-  loadJsonApi( response ) {
-    if( !isIterable( response ) ) {
+  loadJsonApi(response) {
+    if (!isIterable(response))
       response = [response]
-    }
 
     // Assemble the responses into sets of split objects.
     let splitObjectsSet = response.map(
       resp =>
-        splitJsonApiResponse( resp )
+        splitJsonApiResponse(resp)
     )
 
-    this.loadSplitObjectsSet( splitObjectsSet )
+    this.loadSplitObjectsSet(splitObjectsSet)
   }
 
   /**
@@ -374,15 +374,65 @@ export default class DB {
     return obj[fields[fields.length - 1]]
   }
 
-  query( options ) {
+  query(options) {
     console.debug('Query: ', options)
     return executionTime(() => {
-      const {type, filter, sort, ...other} = options
-      let results = this.filter( type, filter, other )
-      if( sort )
-        results = results.then( r => this._sort( r, sort ) )
-      return results.then( r => r.map( x => this.schema.toInstance( x, this ) ) )
+      const {remote = true, ...other} = options
+      if (remote)
+        return this.remoteQuery(other)
+      else
+        return this.localQuery(other)
     })
+  }
+
+  async remoteQuery(options) {
+    const {
+      type,
+      id,
+      operation = 'list',
+      filter,
+      sort,
+      returnType = 'instance',
+      ...other
+    } = options
+
+    // Retrieve the appropriate operation to perform. Defaults to
+    // "list".
+    const model = this.getModel(type)
+    const op = model.ops[operation]
+    if (!op)
+      throw new ModelError(`Unknown operation ${operation} on ${type}.`)
+
+    // Call the operation.
+    const opts = {filter: Filter.toBasic(filter), sort, ...other}
+    let result
+    if (!isEmpty(id))
+      result = await op(id, opts)
+    else
+      result = await op(opts)
+
+    // Load the result into the DB and map IDs.
+    this.loadJsonApi(result)
+    if (Array.isArray(result.data)) {
+      result = result.data.map(x => this.getInstance(makeId(x.type, x.id)))
+      if (returnType === 'instance')
+        result = result.map(x => this.getInstance(x))
+    }
+    else {
+      result = this.getInstance(makeId(result.data.type, result.data.id))
+      if (returnType == 'instance')
+        result = this.getInstance(result)
+    }
+
+    return result
+  }
+
+  localQuery(options) {
+    const {type, filter, sort, ...other} = options
+    let results = this.filter(type, filter, other)
+    if (sort)
+      results = results.then(r => this._sort(r, sort))
+    return results.then(r => r.map(x => this.schema.toInstance(x, this)))
   }
 
   /**
@@ -448,9 +498,7 @@ export default class DB {
     let tbl = this._makeDependencyTable()
     let id = this._getNextReady(tbl)
     while(id) {
-      console.log('ID:', id)
       if (tbl[id].optional.size > 0) {
-        console.log('GOT SOME OPTIONALS')
         const [mainDiff, auxDiff] = this._splitDiff(tbl[id])
         diffs.push(mainDiff)
         tbl[id].diff = auxDiff
@@ -458,7 +506,6 @@ export default class DB {
         tbl[id].optional = new Set()
       }
       else {
-        console.log('NO OPTIONAL')
         diffs.push(tbl[id].diff)
         delete tbl[id]
       }
@@ -539,12 +586,12 @@ export default class DB {
             continue
           if (!field.get('many'))
             related = [related]
+          let kind = field.get('required') ? 'required' : 'optional'
           for (const relId of related) {
             // TODO: Why would relId be null?
             if (isEmpty(relId) || this.exists(relId, 'tail'))
               continue
-            let kind = field.get('required') ? 'required' : 'optional'
-            tbl[tblId][kind] = tbl[tblId][kind].add(relId)
+            tbl[tblId][kind] = tbl[tblId][kind].add(`${relId._type}|${relId.id}`)
           }
         }
       }
@@ -555,7 +602,6 @@ export default class DB {
   _getNextReady(tbl) {
     let next
     for (const id of Object.keys(tbl)) {
-      console.log(tbl[id], tbl[id].required.toJS())
       if (tbl[id].required.size == 0) {
         if (next !== undefined) {
           if (tbl[id].optional.size < tbl[next].optional.size)
@@ -567,10 +613,12 @@ export default class DB {
       if (next !== undefined && tbl[next].optional.size == 0)
         break
     }
-    console.log('NEXT:', next)
-    for (const id of Object.keys(tbl)) {
-      tbl[id].required = tbl[id].required.remove(tbl[next].id)
-      tbl[id].optional = tbl[id].optional.remove(tbl[next].id)
+    if (next) {
+      const nextId = `${tbl[next].id._type}|${tbl[next].id.id}`
+      for (const id of Object.keys(tbl)) {
+        tbl[id].required = tbl[id].required.remove(nextId)
+        tbl[id].optional = tbl[id].optional.remove(nextId)
+      }
     }
     return next
   }

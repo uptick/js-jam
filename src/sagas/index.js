@@ -239,7 +239,10 @@ function * commit(payload) {
   yield call(
     mutate,
     schema,
-    db => db.commit()
+    db => {
+      db.commit()
+      persistToLocalStorage({db, force: true})
+    }
   )
 
   // If specified, synchronise with the server.
