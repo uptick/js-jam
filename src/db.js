@@ -26,7 +26,7 @@ export default class DB {
    */
   constructor(data, options = {}) {
     this.schema = options.schema
-    this.policy = this.schema.policy || options.policy || 'remoteOnly'
+    this.policy = (this.schema && this.schema.policy) || options.policy || 'remoteOnly'
     if (Map.isMap(data))
       this.data = data
     else
@@ -1137,10 +1137,6 @@ export default class DB {
   loadJson(file) {
     return loadJson(file).then(r => {
       this.reset(r)
-      /* this.data = this.data.set('tail', new Map())
-       * this.data = this.data.set('diffs', new List())
-       * this.data = this.data.set('tailptr', 0)
-       * this.commit() */
       this._updateReverseRelationships('head')
       this._updateReverseRelationships('tail')
     })
