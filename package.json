@@ -1,10 +1,10 @@
 {
   "name": "redux-jam",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "description": "A Redux JSON-API model layer.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ABASystems/redux-jam.git"
+    "url": "https://github.com/uptick/redux-jam.git"
   },
   "main": "lib/index.js",
   "scripts": {
@@ -45,7 +45,7 @@
     "is-callable": "^1.1.3",
     "isomorphic-fetch": "^2.2.1",
     "js-cookie": "^2.2.0",
-    "js-tinyapi": "^0.1.0-alpha.3",
+    "js-tinyapi": "^0.1.0-alpha.4",
     "jsdom": "^8.5.0",
     "jsdom-global": "^1.7.0",
     "mocha": "^3.2.0",
@@ -78,7 +78,7 @@
   "peerDependencies": {
     "immutable": "^3.8.2",
     "is-callable": "^1.1.3",
-    "js-tinyapi": "^0.1.0-alpha.3",
+    "js-tinyapi": "^0.1.0-alpha.4",
     "react": "^16.2.0",
     "react-redux": "^5.0.6",
     "redux": "^3.7.2",
