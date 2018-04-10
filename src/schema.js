@@ -77,8 +77,8 @@ export default class Schema {
     return model.toInstance( data, db )
   }
 
-  toObjects( data, db ) {
-    return data.map( objData => this.toObject( objData, db ) )
+  toObjects(data, db) {
+    return data.map(objData => this.toObject(objData,db))
   }
 
   toObject(data) {

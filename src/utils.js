@@ -1,5 +1,9 @@
 import {Iterable, List, Map, Set, Record} from 'immutable'
 
+export function isArray(x) {
+  return Array.isArray(x)
+}
+
 export function isIterable( x ) {
   if( x === null )
     return false
@@ -80,17 +84,29 @@ export const ID = Record({
   id: undefined
 })
 
+export function toID(x) {
+  if (isEmpty(x))
+    x = null
+  else {
+    if (/^\d+$/.test(String(x)))
+      x = parseInt(x)
+  }
+  return x
+}
+
 export function makeId(typeOrObj, id) {
   let r
   if (id === undefined) {
     if (isEmpty(typeOrObj))
       return null
-    r = new ID({_type: typeOrObj._type, id: typeOrObj.id})
+    r = new ID({_type: typeOrObj._type, id: toID(typeOrObj.id)})
   }
   else
-    r = new ID({_type: typeOrObj, id})
-  if (r._type === undefined || r.id === undefined)
+    r = new ID({_type: typeOrObj, id: toID(id)})
+  if (isEmpty(r._type) || isEmpty(r.id)) {
+    console.trace()
     throw new ModelError('Invalid ID: ', r.toJS())
+  }
   return r
 }
 
@@ -106,7 +122,7 @@ export function * iterRecord(rec) {
 export function getDiffId(diff) {
   return makeId(
     diff._type[0] || diff._type[1],
-    (diff.id[0] !== undefined) ? diff.id[0] : diff.id[1]
+    !isNil(diff.id[0]) ? diff.id[0] : diff.id[1]
   )
 }
 

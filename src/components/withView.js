@@ -1,6 +1,7 @@
 import React from 'react'
 import {bindActionCreators} from 'redux'
 import {connect} from 'react-redux'
+import {fromJS} from 'immutable'
 
 import * as modelActions from '../actions'
 import DB from '../db'
@@ -69,19 +70,22 @@ export default options => {
 
     class InnerComponent extends React.Component {
 
-      constructor( props ) {
-        super( props )
-        this.reload( props )
+      constructor(props) {
+        super(props)
+        this.state = {
+          params: {}
+        }
+        this.reload(props)
       }
 
-      reload( props ) {
+      reload(props, params = {}) {
 
         // Only trigger a reload if we've not received `loading` as
         // true in our props, and we actually have a query in the
         // options.
-        if( !props.delayLoad && options.queries ) {
-          console.debug( 'Loading JAM view.' )
-          props.loadModelView({ ...options, props })
+        if (!props.delayLoad && options.queries) {
+          console.debug('Loading JAM view.')
+          props.loadModelView({...options, props, params})
         }
       }
 
@@ -90,7 +94,14 @@ export default options => {
       }
 
       componentWillUnmount() {
-        this.props.clearModelView( options )
+        this.props.clearModelView(options)
+      }
+
+      updateParams = params => {
+        if (!fromJS(this.state.params).equals(fromJS(params))) {
+          this.reload(this.props, params)
+          this.setState({params})
+        }
       }
 
       /**
@@ -117,8 +128,6 @@ export default options => {
       componentWillReceiveProps(nextProps) {
         const {name} = options
         if(name) {
-          const loading = nextProps[name].loading
-          // if(!loading || !this.props.db.equals(nextProps.db))
           if(!this.props.db.equals(nextProps.db))
             this.reload(nextProps)
         }
@@ -127,7 +136,8 @@ export default options => {
       render() {
         return (
           <ComposedComponent
-              {...this.props}
+            updateViewParams={this.updateParams}
+            {...this.props}
           />
         )
       }

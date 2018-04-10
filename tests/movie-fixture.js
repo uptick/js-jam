@@ -115,6 +115,50 @@ export function getMovieData() {
             ]
           }
         }
+      },
+      {
+        type: 'movie',
+        id: 2,
+        attributes: {
+          title: 'Rocky 2',
+          duration: '40'
+        },
+        relationships: {
+          actors: {
+            data: [
+              {
+                type: 'person',
+                id: 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        type: 'movie',
+        id: 3,
+        attributes: {
+          title: 'Rocky 3',
+          duration: '58'
+        },
+        relationships: {
+          actors: {
+            data: [
+              {
+                type: 'person',
+                id: 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        type: 'movie',
+        id: 4,
+        attributes: {
+          title: 'Back to the Future',
+          duration: '58'
+        }
       }
     ],
 

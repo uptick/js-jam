@@ -1,4 +1,6 @@
-import {ID} from './utils'
+import {Set} from 'immutable'
+
+import {ID, negate} from './utils'
 
 const operations = {
 
@@ -42,11 +44,11 @@ class Filter {
     this._r = right
   }
 
-  execute(visitor, options = {}) {
+  execute(visitor) {
     const op = visitor[this._o]
     if (!op)
       throw new Error(`Visitor does not support operation "${this._o}".`)
-    return op.call(visitor, this, this._l, this._r, options)
+    return op.call(visitor, this, this._l, this._r)
   }
 
   and(right) {
@@ -55,6 +57,10 @@ class Filter {
 
   or(right) {
     return new Filter('or', this, right)
+  }
+
+  not() {
+    return operations.not(this)
   }
 
   toBasic() {
@@ -66,8 +72,18 @@ class Filter {
 
 class Visitor {
 
-  not(filter, op, _, options) {
-    return op.execute(this, {not: !(options || {}).not})
+  execute() {
+    this.negation = false
+  }
+
+  not(filter, op) {
+    this.negation = !this.negation
+    try {
+      return op.execute(this)
+    }
+    finally {
+      this.negation = !this.negation
+    }
   }
 
 }
@@ -75,19 +91,20 @@ class Visitor {
 class BasicVisitor extends Visitor {
 
   execute(filter) {
+    super.execute()
     return filter.execute(this)
   }
 
-  eq(filter, field, value, options) {
+  eq(filter, field, value) {
     // TODO: This needs to go elsewhere.
     if (value instanceof ID)
       value = value.id
 
     if (value === null) {
       field += '__nu'
-      value = options.not ? false : true
+      value = !this.negation
     }
-    else if (options.not)
+    else if (this.negation)
       field += '__ne'
 
     return {
@@ -95,10 +112,10 @@ class BasicVisitor extends Visitor {
     }
   }
 
-  and(filter, left, right, options) {
+  and(filter, left, right) {
     return {
-      ...left.execute(this, options),
-      ...right.execute(this, options)
+      ...left.execute(this),
+      ...right.execute(this)
     }
   }
 
@@ -113,33 +130,41 @@ class DBVisitor extends Visitor {
   }
 
   execute(filter) {
-    return this.table._mapIndices(filter.execute(this, {}))
+    super.execute()
+    this.indices = null
+    return this.table._mapIndices(filter.execute(this))
   }
 
-  eq(filter, field, value, options) {
-    if (value === null) { // TODO: Move this
-      field = `${field}__isnull`
-      value = true
+  eq(filter, field, value) {
+    return this._filter(field, (rec, fldName) => {
+      return this.db.getModel(rec._type).equals(fldName, rec[fldName], value)})
+  }
+
+  ['in'](filter, field, value) {
+    return this._filter(field, (rec, fldName) =>
+      this.db.getModel(rec._type).includes(fldName, rec[fldName], value)
+    )
+  }
+
+  and(filter, left, right) {
+    const op = this.negation ? 'union' : 'intersect'
+    return left.execute(this)[op](right.execute(this))
+  }
+
+  or(filter, left, right) {
+    const op = this.negation ? 'intersect' : 'union'
+    return left.execute(this)[op](right.execute(this))
+  }
+
+  _filter(field, cmp) {
+    let idxs = new Set()
+    for (let ii = 0; ii < this.table.size(); ++ii) {
+      for (const lup of this.db.lookup(this.table.at(ii), field)) {
+        if (negate(cmp(...lup), this.negation))
+          idxs = idxs.add(ii)
+      }
     }
-    return this.table._filterIndices({[field]: value}, options)
-  }
-
-  ['in'](filter, field, value, options) {
-    return this.table._filterIndices({[`${field}__in`]: value, ...options})
-  }
-
-  and(filter, left, right, options) {
-    if (options.not)
-      return left.execute(this, options).union(right.execute(this, options))
-    else
-      return left.execute(this).intersect(right.execute(this))
-  }
-
-  or(filter, left, right, options) {
-    if (options.not)
-      return left.execute(this, options).intersect(right.execute(this, options))
-    else
-      return left.execute(this).union(right.execute(this))
+    return idxs
   }
 
 }

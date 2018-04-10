@@ -31,9 +31,9 @@ export default class Table {
     if (data) {
       if (Array.isArray(data)) {
         this.data = new Map({
-          objects: db.toObjects( new List( data ) ),
-          indices: new Map( this.indices.toJS().map( x =>
-            [x, new Map( this._toIndexMap( data, x ) )] )
+          objects: db.toObjects(new List(data)),
+          indices: new Map(this.indices.toJS().map(x =>
+            [x, new Map(this._toIndexMap(data, x))])
           )
         })
       }
@@ -77,6 +77,14 @@ export default class Table {
     return index
   }
 
+  size() {
+    return this.data.getIn(['indices', this.idField]).size
+  }
+
+  at(index) {
+    return this.data.get('objects').get(index)
+  }
+
   /**
    * Get a single object matching the query.
    */
@@ -96,14 +104,16 @@ export default class Table {
    * Filter objects based on a query.
    */
   filter(idOrQuery) {
+    let results
     if (Filter.isFilter(idOrQuery)) {
       let visitor = new DBVisitor(this.db, this.type)
-      return visitor.execute(idOrQuery)
+      results = visitor.execute(idOrQuery)
     }
     else if (!idOrQuery)
-      return this.data.get('objects').valueSeq().toArray()
+      results = this.data.get('objects').valueSeq().toArray()
     else
-      return this._mapIndices(this._filterIndices(idOrQuery))
+      results = this._mapIndices(this._filterIndices(idOrQuery))
+    return results
   }
 
   /**
@@ -149,18 +159,18 @@ export default class Table {
             break
 
           case 'isnull':
-            results = this._reduceIndices( results, () =>
+            results = this._reduceIndices(results, () =>
               // TODO: This is a bit annoying, having to conver to a Set.
               new Set( this.data
-                           .get( 'objects' )
-                           .map( (v, k) => {
+                           .get('objects')
+                           .map((v, k) => {
                              // TODO: Better manage types.
-                             if( this.model.fieldIsManyToMany( match[1] ) )
-                               return negate( v.get( match[1] ).size == 0, not ) ? k : undefined
+                             if (this.model.fieldIsManyToMany(match[1]))
+                               return negate(v.get(match[1]).size == 0, not) ? k : undefined
                              else
-                               return negate( isEmpty( v.get( match[1] ) ), not ) ? k : undefined // TODO: Check if field exists.
+                               return negate(isEmpty(v.get(match[1])), not) ? k : undefined // TODO: Check if field exists.
                            })
-                           .filter( v => v !== undefined ) )
+                           .filter(v => v !== undefined))
             )
             break
 
@@ -207,6 +217,7 @@ export default class Table {
         })
       }
     }
+
     return results
   }
 
@@ -284,21 +295,23 @@ export default class Table {
 
   _getIndex(id) {
     let index = this.data.getIn(['indices', this.idField, this.toIndexable(this.idField, id)])
-    if(index === undefined)
+    if(index === undefined) {
+      console.trace()
       throw new ModelError(`Unknown ID in index lookup for type "${this.model.type}" and ID "${id}"`)
+    }
     return index.first()
   }
 
   /**
    * Eliminate the object's index from current indices.
    */
-  _removeFromIndices( object ) {
-    const id = object.get( this.idField );
-    const index = this._getIndex( id );
-    this.data.get( 'indices' ).forEach( (ii, field) => {
-      if( field == this.idField )
-        return;
-      const value = this.toIndexable( field, object.get( field ) );
+  _removeFromIndices(object) {
+    const id = object.get(this.idField)
+    const index = this._getIndex(id)
+    this.data.get('indices').forEach((ii, field) => {
+      if (field == this.idField)
+        return
+      const value = this.toIndexable(field, object.get(field))
 
       // Remove the object's ID from the index.
       this.data = this.data.updateIn( ['indices', field, value], x => x.delete( index ) );
@@ -309,20 +322,23 @@ export default class Table {
     });
   }
 
-  remove( idOrQuery ) {
-    const obj = this.get( idOrQuery );
-    if( !obj )
-      return;
-    const id = obj.get( 'id' );
-    const index = this._getIndex( id );
+  remove(idOrQuery) {
+    const obj = this.get(idOrQuery)
+    if (!obj)
+      return
+    const id = obj.get('id')
+    const index = this._getIndex(id)
 
     // Remove from extra indices and also the ID index.
-    this._removeFromIndices( obj );
-    this.data = this.data.deleteIn( ['indices', this.idField, id] );
+    this._removeFromIndices(obj)
+    this.data = this.data.deleteIn(['indices', this.idField, id])
 
-    // Can't remove the object or I ruin the indices.
-    // TODO: Fix this.
-    this.data = this.data.setIn( ['objects', index], null );
+    // Can't remove the object or I ruin the indices, unless it's right
+    // at the end.
+    if (index == this.data.get('objects').size - 1)
+      this.data = this.data.update('objects', x => x.slice(0, -1))
+    else
+      this.data = this.data.setIn(['objects', index], null)
   }
 
   reId(oldId, newId) {

@@ -1,5 +1,7 @@
 import React from 'react'
 
+import {renderField} from './field'
+
 export default options => Inner =>
   class extends React.Component {
 
@@ -26,6 +28,8 @@ export default options => Inner =>
       this.setState({db})
     }
 
+    handleChange = ({db}) => this.setDB(db)
+
     initial = (props, db) => {
       return {
         instanceId: props.instanceId || db.create2(options.type, options.defaults)
@@ -42,6 +46,7 @@ export default options => Inner =>
           {...{instance, db, loading}}
           resetForm={this.reset}
           mutateForm={this.mutateForm}
+          renderField={(x = {}) => renderField({onChange: this.handleChange, ...x})}
         />
       )
     }

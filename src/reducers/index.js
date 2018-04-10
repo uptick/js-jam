@@ -126,15 +126,18 @@ const viewReducer = createReducer({}, {
   /**
    * Indicates a model view is currently loading.
    */
-  MODEL_LOAD_VIEW_REQUEST( state, action ) {
-    const { name } = action.payload
+  MODEL_LOAD_VIEW_REQUEST(state, action) {
+    const {name, results} = action.payload
     const viewState = state[name] || {}
-    console.debug( `Model: View load request: ${name}.` )
+    console.debug(`Model: View load request: ${name}.`)
     return {
       ...state,
       [name]: {
-        queries: {},
         ...viewState,
+        queries: {
+          ...viewState.queries,
+          ...results
+        },
         loading: true
       }
     }

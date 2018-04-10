@@ -1,12 +1,16 @@
 import {OrderedSet} from 'immutable'
 import moment from 'moment'
 
-import {isNil, isRecord, isEmpty, makeId, ModelError} from './utils'
+import {isNil, isRecord, isEmpty, makeId, ModelError, toID} from './utils'
 
 export default class Field {
 
   equals(a, b) {
     return a == b
+  }
+
+  includes(a, b) {
+    return a.includes ? a.includes(b) : false
   }
 
   toInternal(value) {
@@ -84,10 +88,15 @@ class TimestampField extends NonTextField {
   }
 
   _toInternal(value) {
+    if (value == 'now')
+      return moment()
     return moment(value)
   }
 
   _fromInternal(value) {
+    // TODO: Should be able to remove this.
+    if (value == 'now')
+      return moment()
     return value.toISOString()
   }
 
@@ -175,6 +184,11 @@ Field.equals = function(type, a, b) {
   return fld ? fld.equals(a, b) : unknownField.equals(a, b)
 }
 
+Field.includes = function(type, a, b) {
+  const fld = fields[type]
+  return fld ? fld.includes(a, b) : unknownField.includes(a, b)
+}
+
 Field.toInternal = function(type, value) {
   const fld = fields[type]
   return fld ? fld.toInternal(value) : unknownField.toInternal(value)
@@ -198,6 +212,10 @@ Field.diff = function(type, from, to) {
 Field.applyDiff = function(type, value, diff, reverse) {
   const fld = fields[type]
   return fld ? fld.applyDiff(value, diff, reverse) : unknownField.applyDiff(value, diff, reverse)
+}
+
+Field.toID = function(value) {
+  return toID(value)
 }
 
 export {

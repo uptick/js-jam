@@ -13,63 +13,50 @@ import {changePage} from './pagination'
 
 function * loadModelView(action) {
   try {
-    const {schema, name, props, queries} = action.payload
-    yield put({type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name}})
+    const {schema, name, props, params, queries} = action.payload
 
     // Load the DB from the state.
     const state = yield select()
-    let db = schema.db( state.model.db )
+    let db = schema.db(state.model.db)
 
-    // A place to put the IDs of our loaded objects.
+    // Before doing *anything* else we need to make sure any
+    // changes pushed to the cache DB are visible throughout
+    // the DOM. Perform a sequence of quick local queries first,
+    // which we will send in with the request payload.
+    // TODO: Need to disable this if remote only query.
+    console.log('Performing local prequery.')
     let results = {}
+    let mappedQueries = {}
+    for (const queryName of Object.keys(queries)) {
+      let query = queries[queryName]
+      if (isCallable(query))
+        query = yield call(query, db, state, props, params)
+      mappedQueries[queryName] = query
+      let data = yield call([db, db.localQuery], query)
+      if (data)
+        results[queryName] = data
+      else
+        results[queryName] = null
+    }
+    yield put({type: 'MODEL_LOAD_VIEW_REQUEST', payload: {name, results}})
 
     // A place to store extra data about our results.
     // TODO: This should probably live in the data itself? Maybe?
     let meta = {}
 
     // A place to hold the JSON responses to be loaded.
-    let jsonData = []
+    /* let jsonData = [] */
 
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
     for (const queryName of Object.keys(queries)) {
       console.debug(`loadModelView: Looking up "${name}.${queryName}"`)
-
-      let data
-      const query = queries[queryName]
-      if (isCallable(query))
-        data = yield call(query, db, state)
-      else
-        data = yield call([db, db.query], query)
+      let query = mappedQueries[queryName]
+      let data = yield call([db, db.query], query)
       if (data)
         results[queryName] = data
       else
         results[queryName] = null
-
-      /* const data = yield call( queries[name], props )
-       * if( data !== null ) {
-       *   jsonData.push( data )
-       * }
-       * if( data ) {
-       *   if( Array.isArray( data.data ) ) {
-
-       *     // First, convert the results into an array of IDs.
-       *     results[name] = data.data.map( x => makeId( x.type, x.id ) )
-
-       *     // Store any links and pagination information.
-       *     meta[name] = {
-       *       ...(data.meta || {})
-       *     }
-       *     if( data.links ) {
-       *       meta[name].links = data.links
-       *     }
-       *   }
-       *   else {
-       *     results[name] = makeId( data.data.type, data.data.id )
-       *   }
-       * }
-       * else
-       *   results[name] = null*/
     }
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
@@ -80,18 +67,18 @@ function * loadModelView(action) {
     // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
 
     // Merge in the loaded data and wait for it to be finished.
-    if( jsonData.length > 0 ) {
-      yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
-      yield take(
-        action => {
-          return (
-            action.type == 'MODEL_LOAD_JSON_DONE'
-            && action.payload
-            && action.payload.jsonData == jsonData
-          )
-        }
-      )
-    }
+    /* if( jsonData.length > 0 ) {
+     *   yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
+     *   yield take(
+     *     action => {
+     *       return (
+     *         action.type == 'MODEL_LOAD_JSON_DONE'
+     *         && action.payload
+     *         && action.payload.jsonData == jsonData
+     *       )
+     *     }
+     *   )
+     * } */
 
     yield put({ type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta} })
   }

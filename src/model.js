@@ -35,7 +35,6 @@ export default class Model {
     for (const key of operations) {
       if (options.ops && key in options.ops) {
         this.ops[key] = (...args) => options.ops[key](...args).then(data => {
-          console.debug(`Model: ${key}: `, data)
           return data
         })
       }
@@ -61,6 +60,10 @@ export default class Model {
    */
   addAttributesToObject(obj) {
     for(const name of this.attributes.keys()) {
+      if (['_type', 'id'].includes(name)) {
+        console.warn(`Model "${this.type}" has an attribute "${name}", ignoring.`)
+        continue
+      }
       Object.defineProperty(obj, name, {
         get: function() {
           return this._values.get(name)
@@ -77,6 +80,10 @@ export default class Model {
    */
   addRelationshipsToObject(obj) {
     for (const name of this.relationships.keys()) {
+      if (['_type', 'id'].includes(name)) {
+        console.warn(`Model "${this.type}" has a relationship "${name}", ignoring.`)
+        continue
+      }
       const rel = this.relationships.get(name)
       if (rel.get('many')) {
         Object.defineProperty(obj, name, {
@@ -151,9 +158,9 @@ export default class Model {
     this.addRelationshipsToObject(this.Instance.prototype)
   }
 
-  addReverseRelationship( field, relation ) {
-    if( !this.relationships.has( field ) ) {
-      this.relationships = this.relationships.set( field, relation )
+  addReverseRelationship(field, relation) {
+    if (!this.relationships.has(field)) {
+      this.relationships = this.relationships.set(field, relation)
       this._makeRecord()
       this._makeInstanceSubclass()
     }
@@ -177,7 +184,7 @@ export default class Model {
   toData(data) {
     let obj = {
       _type: this.type,
-      id: data.id
+      id: Field.toID(data.id)
     }
     for (const fldName of iterRecord(data || {}))
       obj[fldName] = this.toInternal(fldName, data[fldName])
@@ -231,11 +238,22 @@ export default class Model {
   }
 
   toInternal(fldName, value) {
-    return this._fieldOp(fldName, type => Field.toInternal(type, value), value)
+    if (fldName == 'id')
+      return Field.toID(value)
+    else
+      return this._fieldOp(fldName, type => Field.toInternal(type, value), value)
+  }
+
+  fromInternal(fldName, value) {
+    return this._fieldOp(fldName, type => Field.fromInternal(type, value), value)
   }
 
   equals(fldName, a, b) {
     return this._fieldOp(fldName, type => Field.equals(type, a, b))
+  }
+
+  includes(fldName, a, b) {
+    return this._fieldOp(fldName, type => Field.includes(type, a, b))
   }
 
   _fieldOp(fldName, callback, defaultValue) {
@@ -444,6 +462,7 @@ export default class Model {
       }
 
     }
+
     return rec
   }
 

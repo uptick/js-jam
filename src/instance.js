@@ -1,11 +1,8 @@
-import { OrderedSet, Map } from 'immutable'
+import {OrderedSet, Map} from 'immutable'
 import uuid from 'uuid'
 
 import {
   isEmpty,
-  toArray,
-  cmpIds,
-  toList,
   ModelError
 } from './utils'
 
@@ -21,24 +18,20 @@ export class BaseInstance {
     return value instanceof BaseInstance
   }
 
-  constructor( data, model, db ) {
-    if( isEmpty( model ) ) {
-      throw new ModelError( 'Instance: No model given.' )
-    }
-    /* if( isEmpty( db ) ) {
-     *   throw new ModelError( 'Instance: No DB given.' )
-     * }*/
-    this.id = data.get( 'id' ) || uuid.v4()
+  constructor(data, model, db) {
+    if (isEmpty(model))
+      throw new ModelError('Instance: No model given.')
+    this.id = data.get('id') || uuid.v4()
     this._db = db
     this._model = model
     this._type = model.type
     this._initial = data
     this._values = new Map()
-    this._setInitialValues( data )
+    this._setInitialValues(data)
   }
 
-  set( field, value ) {
-    this._model.switchOnField( field, {
+  set(field, value) {
+    this._model.switchOnField(field, {
       attribute: () => {
         this[field] = value
       },
@@ -46,16 +39,15 @@ export class BaseInstance {
         this[field] = value
       },
       manyToMany: () => {
-        this[field].add( value )
+        this[field].add(value)
       }
-    })      
+    })
     return this
   }
 
-  save( db ) {
-    if( !db ) {
+  save(db) {
+    if (!db)
       db = this._db
-    }
     // TODO: This is a bit silly, surely it could just be this._values?
     db.createOrUpdate({
       ...(this._values.toJS()),
@@ -66,7 +58,7 @@ export class BaseInstance {
   }
 
   delete() {
-    this._db.remove( this._values )
+    this._db.remove(this._values)
   }
 
   reset() {
@@ -107,9 +99,9 @@ export class BaseInstance {
  * finding local DB instances easier.
  */
 export default class Instance extends BaseInstance {
-  constructor( ...args ) {
-    super( ...args )
-    this._model.addAttributesToObject( this )
-    this._model.addRelationshipsToObject( this )
+  constructor(...args) {
+    super(...args)
+    this._model.addAttributesToObject(this)
+    this._model.addRelationshipsToObject(this)
   }
 }

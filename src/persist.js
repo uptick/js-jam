@@ -100,11 +100,10 @@ function deserializeDBDiffs(db, diffsData) {
         id: sDiff.id
       }
       for (const [fldName, v] of Object.entries(rest)) {
-        if (!['id', '_type'].includes(fldName)) {
-          const fldType = model.getFieldType(fldName)
+        if (fldName != '_type') {
           diff[fldName] = [
-            Field.toInternal(fldType, v[0]),
-            Field.toInternal(fldType, v[1])
+            model.toInternal(fldName, v[0]),
+            model.toInternal(fldName, v[1])
           ]
         }
         if (ii !== undefined)

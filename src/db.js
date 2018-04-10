@@ -7,7 +7,7 @@ import Instance from './instance'
 import {Filter} from './filter'
 import {toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
         toList, Rollback, ModelError, splitJsonApiResponse, saveJson, loadJson,
-        isEmpty, isRecord} from './utils'
+        isArray, isEmpty, isRecord, getDiffType} from './utils'
 import {executionTime} from './debug'
 import * as modelActions from './actions'
 
@@ -26,6 +26,7 @@ export default class DB {
    */
   constructor(data, options = {}) {
     this.schema = options.schema
+    this.policy = this.schema.policy || options.policy || 'remoteOnly'
     if (Map.isMap(data))
       this.data = data
     else
@@ -50,11 +51,32 @@ export default class DB {
           this.data = this.data.setIn(['tail', type], tbl.data)
         })
       }
-      this.data = this.data.set('diffs', new List(data.diffs || []))
+      this.resetDiffs(data.diffs)
       this.data = this.data.set('tailptr', data.tailptr || 0)
       this.resetIndices('tail')
       this.resetHead()
     }
+  }
+
+  resetDiffs(data) {
+    this.data = this.data.set(
+      'diffs',
+      new List((data || []).map(diff => {
+        const type = getDiffType(diff)
+        const model = this.getModel(type)
+        for (const [fldName, val] of Object.entries(diff)) {
+          if (fldName != '_type') {
+            diff[fldName] = [
+              model.toInternal(fldName, val[0]),
+              model.toInternal(fldName, val[1])
+            ]
+          }
+          else
+            diff[fldName] = val
+        }
+        return diff
+      }))
+    )
   }
 
   resetHead() {
@@ -79,7 +101,11 @@ export default class DB {
   }
 
   copy() {
-    return new DB(this.data, {schema: this.schema})
+    return new DB(
+      this.data, {
+        policy: this.policy,
+        schema: this.schema
+      })
   }
 
   bindDispatch( dispatch ) {
@@ -154,25 +180,30 @@ export default class DB {
     this.loadSplitObjectsSet( splitObjects )
   }
 
+  getLocalDiffs() {
+    const tp = this.data.get('tailptr')
+    return this.data.get('diffs').slice(tp)
+  }
+
+  getOutgoingDiffs() {
+    const tp = this.data.get('tailptr')
+    return this.data.get('diffs').slice(0, tp)
+  }
+
   loadSplitObjectsSet( splitObjectsSet ) {
     splitObjectsSet = toList( splitObjectsSet )
 
-    // Construct our current diffs for later replay. These are changes
-    // yet to be committed.
-    let localDiffs = this.getDiffs()
-
-    // Unapply my outgoing diffs to makre sure we don't duplicate
-    // the diffs.
-    for( const diff of this.data.get( 'diffs' ) ) {
-      this.applyDiff( diff, true, 'tail' )
-    }
+    // Unapply my outgoing diffs to make sure we don't duplicate
+    // the diffs. This must be done in reverse.
+    for (const diff of this.getOutgoingDiffs().reverse())
+      this.applyDiff(diff, true, 'tail')
 
     // Load all reponse objects.
     for( const splitObjects of splitObjectsSet ) {
 
       // Now update the head data state to reflect the new server
       // information.
-      Object.keys( splitObjects ).forEach( type => {
+      Object.keys(splitObjects).forEach(type => {
 
         // Skip any tables we don't have a model type for.
         let tbl
@@ -181,14 +212,14 @@ export default class DB {
         }
         catch( e ) {
           // TODO: Catch specific type for missing model.
-          console.warn( e )
+          console.warn(e)
           return;
         }
 
-        splitObjects[type].map( obj => {
-          tbl.set( obj )
-        })
-        this.saveTable( tbl, 'tail' )
+        splitObjects[type].map(obj =>
+          tbl.set(obj)
+        )
+        this.saveTable(tbl, 'tail')
       })
     }
 
@@ -197,15 +228,15 @@ export default class DB {
 
     // Replay outgoing diffs onto tail. This is to match the expectation
     // that outgoing diffs will be applied to the server.
-    for( const diff of this.data.get( 'diffs' ) )
-      this.applyDiff( diff, false, 'tail' )
+    for (const diff of this.getOutgoingDiffs())
+      this.applyDiff(diff, false, 'tail')
 
     // Replace head with tail.
-    this.data = this.data.set( 'head', this.data.get( 'tail' ) )
+    this.data = this.data.set('head', this.data.get('tail'))
 
     // Replay local diffs onto head.
-    for( const diff of localDiffs )
-      this.applyDiff( diff )
+    for (const diff of this.getLocalDiffs())
+      this.applyDiff(diff)
   }
 
   _updateReverseRelationships(branch = 'head') {
@@ -283,8 +314,8 @@ export default class DB {
     return res
   }
 
-  getModel( type, fail = false ) {
-    return this.schema.getModel( type, fail )
+  getModel(type, fail = false) {
+    return this.schema.getModel(type, fail)
   }
 
   getTable( type, branch = 'head' ) {
@@ -306,7 +337,7 @@ export default class DB {
   }
 
   toObjects( data ) {
-    return this.schema.toObjects( data, this );
+    return this.schema.toObjects(data, this)
   }
 
   getInstance(typeOrQuery, idOrQuery) {
@@ -326,7 +357,7 @@ export default class DB {
       throw new ModelError(`Failed to find object: ${typeOrQuery._type}, ${typeOrQuery.id}`)
     // TODO: Should be using `obj` from above here or what?!
     return this.schema.toInstance(
-      this.get( typeOrQuery, idOrQuery ),
+      this.get(typeOrQuery, idOrQuery),
       this
     );
   }
@@ -335,54 +366,71 @@ export default class DB {
     return this.getTable( id._type, branch ).get( id.id ) !== undefined;
   }
 
-  /**
-   * Filter data both locally and on the server.
-   */
-  filter( type, filter, options ) {
-    // TODO: Query the server if we have network and have not
-    //   been flagged to avoid external requests.
-    // if( navigator.onLine ) {
-    //  options.filter = filter  // TODO: merge? 
-    // }
-    return Promise.resolve(
-      this.getTable( type ).filter( filter )
-    )
+  filter(type, filter, options) {
+    return this.getTable(type).filter(filter)
   }
 
-  _sort( results, fields ) {
-    // TODO: Check if sort fields exist.
-    fields = toArray( fields )
-    return results.sort( ( a, b ) => {
-      for( let f of fields ) {
+  _sort(results, fields) {
+    fields = toArray(fields)
+    return results.sort((a, b) => {
+      for (let f of fields) {
         const d = (f[0] === '-') ? -1 : 1
-        const av = this._getSortValue( a, f ), bv = this._getSortValue( b, f )
-        if( av < bv ) return -d
-        if( av > bv ) return d
+        const av = this.lookupFirstValue(a, f)
+        const bv = this.lookupFirstValue(b, f)
+        if(av < bv) return -d
+        if(av > bv) return d
       }
       return 0
     })
   }
 
-  _getSortValue( obj, field ) {
-    return this._lookup( obj, field.split( '__' ) )
+  * lookup(record, field) {
+    const _iter = function * (rec, flds) {
+      if (!rec)
+        return
+      rec = this.get(rec)
+      const f = flds[0]
+      if (flds.length > 1) {
+        const model = this.getModel(rec._type)
+        if (model.fieldIsForeignKey(f)) {
+          for (const r of _iter(rec[f], flds.slice(1)))
+            yield r
+        }
+        else if (model.fieldIsManyToMany(f)) {
+          for (const n of rec[f])
+            for (const r of _iter(n, flds.slice(1)))
+              yield r
+        }
+        else
+          throw new ModelError(`Cannot lookup non-related field.`)
+      }
+      else
+        yield [rec, f]
+    }.bind(this)
+
+    if (!isArray(field))
+      field = field.split('__')
+    for (const r of _iter(record, field))
+      yield r
   }
 
-  _lookup( obj, fields ) {
-    if( fields.length > 1 )
-      for( const f of fields.slice( 0, fields.length - 1 ) )
-        obj = this.get( obj[f] )
-    return obj[fields[fields.length - 1]]
+  lookupFirstValue(record, field) {
+    for (const r of this.lookup(record, field))
+      return r[0][r[1]]
+    return null
   }
 
   query(options) {
-    console.debug('Query: ', options)
-    return executionTime(() => {
-      const {remote = true, ...other} = options
-      if (remote)
-        return this.remoteQuery(other)
-      else
-        return this.localQuery(other)
-    })
+    const {policy = this.policy, ...other} = options
+    let result
+    if (policy == 'remoteOnly')
+      result = this.remoteQuery(other)
+    else if (policy == 'local')
+      result = this.localQuery(other)
+    else
+      result = this.remoteQuery(other)
+                   .then(() => this.localQuery(other))
+    return result
   }
 
   async remoteQuery(options) {
@@ -414,12 +462,13 @@ export default class DB {
     // Load the result into the DB and map IDs.
     this.loadJsonApi(result)
     if (Array.isArray(result.data)) {
-      result = result.data.map(x => this.getInstance(makeId(x.type, x.id)))
+      result = result.data.map(x => makeId(x.type, x.id))
       if (returnType === 'instance')
         result = result.map(x => this.getInstance(x))
+      result = new List(result)
     }
     else {
-      result = this.getInstance(makeId(result.data.type, result.data.id))
+      result = makeId(result.data.type, result.data.id)
       if (returnType == 'instance')
         result = this.getInstance(result)
     }
@@ -431,8 +480,9 @@ export default class DB {
     const {type, filter, sort, ...other} = options
     let results = this.filter(type, filter, other)
     if (sort)
-      results = results.then(r => this._sort(r, sort))
-    return results.then(r => r.map(x => this.schema.toInstance(x, this)))
+      results = this._sort(results, sort)
+    results = results.map(x => this.schema.toInstance(x, this))
+    return results
   }
 
   /**
@@ -486,6 +536,10 @@ export default class DB {
 
   getDiffs2() {
     return this.data.get('diffs')
+  }
+
+  getOutgoingDiffs() {
+    return this.getDiffs2().slice(0, this.data.get('tailptr'))
   }
 
   getTailPointer() {
@@ -693,7 +747,11 @@ export default class DB {
 
   create(data) {
     const model = this.getModel(data._type)
-    let object = this.toObject(data)
+    const id = data.id || uuid.v4()
+    let object = this.toObject({
+      ...data,
+      id
+    })
     if (object.id === undefined)
       object = object.set('id', uuid.v4())
     const diff = model.diff(undefined, object)
@@ -761,6 +819,7 @@ export default class DB {
   }
 
   applyDiff(diff, reverse = false, branch = 'head') {
+    console.debug((reverse ? 'Unapplying' : 'Applying')  + ' diff: ', diff)
     const id = getDiffId(diff)
     let tbl = this.getTable(id._type, branch)
     tbl.applyDiff(diff, reverse)
@@ -820,7 +879,7 @@ export default class DB {
     // If no diff was given, use the oldest one available.
     // If no such diff is available then return.
     if (!diff) {
-      diff = this.data.getIn(['diffs', 0])
+      diff = this.getOutgoingDiffs().get(0)
       if(!diff)
         return
     }
@@ -1077,11 +1136,11 @@ export default class DB {
 
   loadJson(file) {
     return loadJson(file).then(r => {
-      r.tail = r.head
-      r.head = {}
       this.reset(r)
-      this.data = this.data.set('head', this.data.get('tail'))
-      this.data = this.data.set('tail', new Map())
+      /* this.data = this.data.set('tail', new Map())
+       * this.data = this.data.set('diffs', new List())
+       * this.data = this.data.set('tailptr', 0)
+       * this.commit() */
       this._updateReverseRelationships('head')
       this._updateReverseRelationships('tail')
     })
