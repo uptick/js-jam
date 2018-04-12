@@ -1,7 +1,7 @@
 import {OrderedSet, Record, fromJS} from 'immutable'
 
 import {BaseInstance} from './instance'
-import {isEmpty, iterRecord, getDiffOp, ModelError} from './utils'
+import {toID, isEmpty, iterRecord, getDiffOp, ModelError} from './utils'
 import Field from './field'
 
 export default class Model {
@@ -98,12 +98,12 @@ export default class Model {
                 if (rel.get('reverse'))
                   throw new ModelError('Cannot set reverse relationships.')
                 this._values = this._values.updateIn([name], y => {
-                  return y.add(this._db.getId(x))
+                  return y.add(this._db.makeId(x))
                 })
               },
               remove: x => {
                 this._values = this._values.updateIn([name], y =>
-                  y.remove(this._db.getId(x))
+                  y.remove(this._db.makeId(x))
                 )
               }
             }
@@ -134,7 +134,7 @@ export default class Model {
           },
           set: function(x) {
             if(x)
-              this._values = this._values.set(name, this._db.getId(x))
+              this._values = this._values.set(name, this._db.makeId(x))
             else
               this._values = this._values.set(name, x)
           }
@@ -176,18 +176,18 @@ export default class Model {
   }
 
   // TODO: Rename to "toRecord"
-  toObject(data) {
-    return new this._record(this.toData(data))
+  toObject(data, db) {
+    return new this._record(this.toData(data, db))
   }
 
   // TODO: Rename to "toObject"
-  toData(data) {
+  toData(data, db) {
     let obj = {
       _type: this.type,
-      id: Field.toID(data.id)
+      id: this.toInternal('id', data.id, db)
     }
     for (const fldName of iterRecord(data || {}))
-      obj[fldName] = this.toInternal(fldName, data[fldName])
+      obj[fldName] = this.toInternal(fldName, data[fldName], db)
     return obj
   }
 
@@ -219,7 +219,7 @@ export default class Model {
       if (isEmpty(value))
         r = null
       else
-        r = `${value}`
+        r = toID(value)
     }
     else {
       this.switchOnField(fldName, {
@@ -237,11 +237,14 @@ export default class Model {
     return r
   }
 
-  toInternal(fldName, value) {
-    if (fldName == 'id')
+  toInternal(fldName, value, db) {
+    if (fldName == 'id') {
+      if (db)
+        value = db.mapID(this.type, value)
       return Field.toID(value)
+    }
     else
-      return this._fieldOp(fldName, type => Field.toInternal(type, value), value)
+      return this._fieldOp(fldName, type => Field.toInternal(type, value, db), value)
   }
 
   fromInternal(fldName, value) {
@@ -259,6 +262,9 @@ export default class Model {
   _fieldOp(fldName, callback, defaultValue) {
     let r = defaultValue
     this.switchOnField(fldName, {
+      id: function(fld) {
+        r = callback('id')
+      },
       attribute: function(fld) {
         r = callback(fld.get('type'))
       },
@@ -376,7 +382,7 @@ export default class Model {
         return null
       for (const fldName of this.iterFields()) {
         if (toObj[fldName] !== undefined)
-          diff[fldName] = [undefined, toObj[fldName]]
+          diff[fldName] = [null, toObj[fldName]]
       }
     }
 
@@ -384,7 +390,7 @@ export default class Model {
     else if (isEmpty(toObj)) {
       for (const field of this.iterFields()) {
         if (fromObj[field] !== undefined)
-          diff[field] = [fromObj[field], undefined]
+          diff[field] = [fromObj[field], null]
       }
     }
 
@@ -417,7 +423,7 @@ export default class Model {
     return Object.keys(diff).length ? diff : null
   }
 
-  applyDiff(rec, diff, reverse) {
+  applyDiff(rec, diff, reverse, db) {
     if (!isEmpty(diff)) {
       const ii = reverse ? 1 : 0
       const jj = reverse ? 0 : 1
@@ -428,7 +434,7 @@ export default class Model {
           throw new ModelError('Trying to create an object that already exists.')
         let data = {}
         Object.keys(diff).forEach(x => data[x] = diff[x][jj])
-        rec = this.toObject(data)
+        rec = this.toObject(data, db)
       }
 
       // Removal.
@@ -495,25 +501,26 @@ export default class Model {
     return {data}
   }
 
-  switchOnField( field, ops ) {
+  switchOnField(field, ops) {
     let call
-    let info = this.relationships.get( field )
-    if( info !== undefined ) {
-      if( info.get( 'many' ) ) {
-        call = ops.manyToMany
+    let info
+    if (field == 'id')
+      call = ops.id
+    else {
+      info = this.relationships.get(field)
+      if (info !== undefined) {
+        if (info.get('many'))
+          call = ops.manyToMany
+        else
+          call = ops.foreignKey
       }
       else {
-        call = ops.foreignKey
+        info = this.attributes.get(field)
+        if (info !== undefined)
+          call = ops.attribute
       }
     }
-    else {
-      info = this.attributes.get( field )
-      if( info !== undefined ) {
-        call = ops.attribute
-      }
-    }
-    if( call ) {
+    if (call)
       call(info)
-    }
   }
 }

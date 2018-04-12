@@ -45,6 +45,15 @@ export const schema = new Schema({
   person: {
     attributes: {
       name: {}
+    },
+    relationships: {
+      owns: {
+        type: 'movie',
+        many: true
+      },
+      favorite: {
+        type: 'movie'
+      }
     }
   },
 

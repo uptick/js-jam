@@ -88,16 +88,14 @@ export default class Table {
   /**
    * Get a single object matching the query.
    */
-  get(idOrQuery, required) {
-    const objects = this.filter(idOrQuery)
-    if (!objects.size) {
+  get(id, required) {
+    const idx = this.data.getIn(['indices', 'id', this.toIndexable('id', this.db.mapID(this.type, id))])
+    if (idx === undefined) {
       if (required)
         throw new ModelError('No such object.')
       return
     }
-    if(objects.size > 1)
-      throw new ModelError('Too many objects returned in table.')
-    return objects.first()
+    return this.data.getIn(['objects', idx.first()])
   }
 
   /**
@@ -105,14 +103,15 @@ export default class Table {
    */
   filter(idOrQuery) {
     let results
-    if (Filter.isFilter(idOrQuery)) {
-      let visitor = new DBVisitor(this.db, this.type)
+    if (!idOrQuery)
+      results = this.data.get('objects').valueSeq().toArray()
+    else {
+      if (!Filter.isFilter(idOrQuery))
+        idOrQuery = Filter.toFilter(idOrQuery) // TODO: Deprecate one day?
+      const visitor = new DBVisitor(this.db, this.type)
       results = visitor.execute(idOrQuery)
     }
-    else if (!idOrQuery)
-      results = this.data.get('objects').valueSeq().toArray()
-    else
-      results = this._mapIndices(this._filterIndices(idOrQuery))
+    /* results = this._mapIndices(this._filterIndices(idOrQuery)) */
     return results
   }
 
@@ -241,14 +240,8 @@ export default class Table {
   }
 
   set(object) {
-
-    // TODO: Must be a better way to convert to a record...
-    try {
-      object.get('id')
-    }
-    catch(e) {
-      object = this.db.toObject(object)
-    }
+    // TODO: Is this a performance issue?
+    object = this.db.toObject(object)
 
     // If the object doesn't exist, just add it on to the end. Don't
     // worry about adding all the indices, we'll put them in at the
@@ -256,7 +249,7 @@ export default class Table {
     const id = object[this.idField]
     if(isEmpty(id))
       throw new ModelError('No ID given for "table.set".')
-    const existing = this.get({[this.idField]: id})
+    const existing = this.get(id)
     if (!existing) {
       const size = this.data.get('objects').size
       this.data = this.data
@@ -417,7 +410,7 @@ export default class Table {
   applyDiff(diff, reverse = false) {
     const id = getDiffId(diff)
     let rec = this.get(id.id)
-    rec = this.model.applyDiff(rec, diff, reverse)
+    rec = this.model.applyDiff(rec, diff, reverse, this.db)
     if (rec === null) {
       const ii = reverse ? 1 : 0
       this.remove(diff.id[ii])

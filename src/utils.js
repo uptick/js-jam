@@ -96,17 +96,13 @@ export function toID(x) {
 
 export function makeId(typeOrObj, id) {
   let r
-  if (id === undefined) {
+  if (isEmpty(id)) {
     if (isEmpty(typeOrObj))
       return null
     r = new ID({_type: typeOrObj._type, id: toID(typeOrObj.id)})
   }
   else
     r = new ID({_type: typeOrObj, id: toID(id)})
-  if (isEmpty(r._type) || isEmpty(r.id)) {
-    console.trace()
-    throw new ModelError('Invalid ID: ', r.toJS())
-  }
   return r
 }
 
@@ -127,9 +123,9 @@ export function getDiffId(diff) {
 }
 
 export function getDiffOp(diff) {
-  if (isEmpty(diff._type[0]))
+  if (isNil(diff._type[0]))
     return 'create'
-  else if (isEmpty(diff._type[1]))
+  else if (isNil(diff._type[1]))
     return 'remove'
   else
     return 'update'

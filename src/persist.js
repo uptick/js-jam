@@ -3,7 +3,6 @@ import {createTransform} from 'redux-persist'
 import DB from './db'
 import Field from './field'
 import {argopts, getDiffOp, getDiffType, isEmpty} from './utils'
-import {executionTime} from './debug'
 
 const jamTransform = schema => {
   return createTransform(
@@ -72,6 +71,10 @@ function serializeDBDiffs(db) {
   })
 }
 
+function serializeDBIDs(db) {
+  return JSON.stringify(db.data.get('ids', {}).toJS())
+}
+
 function deserializeDBTail(db, tailData) {
   if (isEmpty(tailData))
     return null
@@ -107,7 +110,7 @@ function deserializeDBDiffs(db, diffsData) {
           ]
         }
         if (ii !== undefined)
-          diff[fldName][ii] = undefined
+          diff[fldName][ii] = null
       }
       return diff
     }),
@@ -115,29 +118,38 @@ function deserializeDBDiffs(db, diffsData) {
   }
 }
 
-function deserializeDB(db, tailData, diffsData) {
+function deserializeDBIDs(db, idsData) {
+  if (isEmpty(idsData))
+    return null
+  return JSON.parse(idsData)
+}
+
+function deserializeDB(db, tailData, diffsData, idsData) {
   let tail = deserializeDBTail(db, tailData)
   let diffs = deserializeDBDiffs(db, diffsData)
-  db.reset({tail, ...diffs})
+  let ids = deserializeDBIDs(db, idsData)
+  db.reset({tail, ...diffs, ids})
   return db
 }
 
 function persistToLocalStorage(options) {
   console.debug('Persisting to local storage.')
-  executionTime(() => {
-    let [db, opts] = argopts(options, 'db', DB.isDB)
-    if (opts.force || localStorage.getItem('jam|tail') == null)
-      localStorage.setItem('jam|tail', serializeDBTail(db))
-    localStorage.setItem('jam|diffs', serializeDBDiffs(db))
-  })
+  let [db, opts] = argopts(options, 'db', DB.isDB)
+  if (opts.force || localStorage.getItem('jam|tail') == null)
+    localStorage.setItem('jam|tail', serializeDBTail(db))
+  localStorage.setItem('jam|diffs', serializeDBDiffs(db))
+  localStorage.setItem('jam|ids', serializeDBIDs(db))
 }
 
 function rehydrateFromLocalStorage(options) {
   console.debug('Rehydrating from local storage.')
-  executionTime(() => {
-    let [db, opts] = argopts(options, 'db', DB.isDB)
-    return deserializeDB(db, localStorage.getItem('jam|tail'), localStorage.getItem('jam|diffs'))
-  })
+  let [db, opts] = argopts(options, 'db', DB.isDB)
+  return deserializeDB(
+    db,
+    localStorage.getItem('jam|tail'),
+    localStorage.getItem('jam|diffs'),
+    localStorage.getItem('jam|ids')
+  )
 }
 
 export default jamTransform

@@ -97,16 +97,20 @@ function * sync(action) {
   try {
     yield put({type: 'MODEL_SYNC_REQUEST'})
     while(1) {
-      let state = yield select()
-      let db = schema.db(state.model.db)
-      let rsp = yield call([db, db.commitDiff])
-      if(!rsp)
+
+      // Refresh state on each push.
+      const state = yield select()
+      const db = schema.db(state.model.db)
+      const rsp = yield call([db, db.commitDiff])
+      if (!rsp)
         break
+
       // I'll be the only one sending post commit diffs, so I can wait for
       // it to finish in here. If I don't wait for the post commit diff to
       // be done, we continue on and pick up the same diff again.
       yield put({type: 'MODEL_POST_COMMIT_DIFF', payload: {schema, response: rsp}})
       yield take('MODEL_POST_COMMIT_DIFF_DONE')
+
     }
     yield put({type: 'MODEL_SYNC_SUCCESS'})
   } catch(e) {
@@ -209,12 +213,12 @@ export function* abortTransaction( payload ) {
 /**
  * Mutate a DB by committing a transaction
  */
-export function* commitTransaction( payload ) {
+export function * commitTransaction(payload) {
   yield call(
     mutate,
     payload.schema,
     db =>
-      db.commitTransaction( payload.name )
+      db.commitTransaction(payload.name)
   )
 }
 
@@ -255,26 +259,26 @@ function * postCommitDiff(payload) {
 /**
  * Mutate a DB by loading data returned in JSONAPI
  */
-function* loadJson( payload ) {
+function * loadJson(payload) {
   yield call(
     mutate,
     payload.schema,
     db => {
-      for( const data of payload.jsonData ) {
+      for (const data of payload.jsonData) {
 
         // TODO: For some reason exceptions don't get propagated
         // from within this call. No idea why...
-        db.loadJsonApi( data )
+        db.loadJsonApi(data)
       }
     }
   )
-  yield put( {type: 'MODEL_LOAD_JSON_DONE', payload} )
+  yield put({type: 'MODEL_LOAD_JSON_DONE', payload})
 }
 
 /**
  * Mutate a DB by clearing.
  */
-function* clear( payload ) {
+function * clear(payload) {
   yield call(
     mutate,
     payload.schema,

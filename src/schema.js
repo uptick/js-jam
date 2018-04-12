@@ -81,11 +81,18 @@ export default class Schema {
     return data.map(objData => this.toObject(objData,db))
   }
 
-  toObject(data) {
+  toObject(data, db) {
     const model = this.getModel(data._type)
     if (model === undefined)
       throw new ModelError(`Unknown model type: ${data._type}`)
-    return model.toObject(data)
+    return model.toObject(data, db)
+  }
+
+  toData(data, db) {
+    const model = this.getModel(data._type)
+    if (model === undefined)
+      throw new ModelError(`Unknown model type: ${data._type}`)
+    return model.toData(data, db)
   }
 
   createInstance( type, data, db ) {

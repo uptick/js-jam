@@ -13,10 +13,10 @@ export default class Field {
     return a.includes ? a.includes(b) : false
   }
 
-  toInternal(value) {
+  toInternal(value, db) {
     if (isNil(value))
       return null
-    return this._toInternal(value)
+    return this._toInternal(value, db)
   }
 
   fromInternal(value) {
@@ -25,7 +25,7 @@ export default class Field {
     return this._fromInternal(value)
   }
 
-  _toInternal(value) {
+  _toInternal(value, db) {
     return value
   }
 
@@ -55,10 +55,10 @@ export default class Field {
 
 class NonTextField extends Field {
 
-  toInternal(value) {
+  toInternal(value, db) {
     if (isEmpty(value))
       return null
-    return this._toInternal(value)
+    return this._toInternal(value, db)
   }
 
   fromInternal(value) {
@@ -71,7 +71,7 @@ class NonTextField extends Field {
 
 class BooleanField extends NonTextField {
 
-  _toInternal = value => {
+  _toInternal(value, db) {
     return [true, 'true', 'TRUE', 1].includes(value)
   }
 
@@ -87,7 +87,7 @@ class TimestampField extends NonTextField {
     return a == b
   }
 
-  _toInternal(value) {
+  _toInternal(value, db) {
     if (value == 'now')
       return moment()
     return moment(value)
@@ -109,11 +109,15 @@ class ForeignKeyField extends NonTextField {
       return a.equals(b)
     else if (isRecord(b))
       return b.equals(a)
-    return a == b
+    else
+      return a == b
   }
 
-  _toInternal(value) {
-    return makeId(value)
+  _toInternal(value, db) {
+    value = makeId(value)
+    if (value && db)
+      value = makeId(value._type, db.mapID(value._type, value.id))
+    return value
   }
 
   _fromInternal(value) {
@@ -139,10 +143,12 @@ class ManyToManyField extends ForeignKeyField {
     return a == b
   }
 
-  toInternal(value) {
+  toInternal(value, db) {
     if (isEmpty(value))
       value = []
-    return new OrderedSet(value.map(x => makeId(x)))
+    return new OrderedSet(
+      value.map(x => super._toInternal(x, db)).filter(x => x !== null)
+    )
   }
 
   fromInternal(value) {
@@ -189,9 +195,9 @@ Field.includes = function(type, a, b) {
   return fld ? fld.includes(a, b) : unknownField.includes(a, b)
 }
 
-Field.toInternal = function(type, value) {
+Field.toInternal = function(type, value, db) {
   const fld = fields[type]
-  return fld ? fld.toInternal(value) : unknownField.toInternal(value)
+  return fld ? fld.toInternal(value, db) : unknownField.toInternal(value, db)
 }
 
 Field.fromInternal = function(type, value) {

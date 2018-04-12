@@ -54,7 +54,7 @@ describe('persistToLocalStorage', function() {
 
 })
 
-describe('persisting and rehydrating', function() {
+describe('Persisting and rehydrating', function() {
   let data = {
     book: {
       title: 'A nice book',
@@ -63,14 +63,20 @@ describe('persisting and rehydrating', function() {
   }
   let db = schema.db()
   db.create2('book', data.book)
+  db.create2('book', data.book)
   db.commit()
+  db.postCommitDiff({
+    data: {
+      type: 'book',
+      id: 1001
+    }
+  })
 
   it('saves and loads the same data', function() {
     localStorage.clear()
     persistToLocalStorage(db)
     let db2 = schema.db()
     rehydrateFromLocalStorage(db2)
-    db.data = db.data.set('ids', new Map())
     expect(db.equals(db2)).to.be.true()
   })
 

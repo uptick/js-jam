@@ -7,7 +7,8 @@ import Instance from './instance'
 import {Filter} from './filter'
 import {toArray, makeId, getDiffOp, getDiffId, isObject, isIterable,
         toList, Rollback, ModelError, splitJsonApiResponse, saveJson, loadJson,
-        isArray, isEmpty, isRecord, getDiffType} from './utils'
+        isArray, isNil, isEmpty, isRecord, getDiffType} from './utils'
+import {toID} from './utils'
 import {executionTime} from './debug'
 import * as modelActions from './actions'
 
@@ -34,15 +35,15 @@ export default class DB {
   }
 
   reset(data) {
-    this.data = new Map({
-      head: new Map(),
-      tail: new Map(),
-      ids: new Map(),
-      diffs: new List(),
+    this.data = fromJS({
+      head: {},
+      tail: {},
+      ids: {},
+      diffs: [],
       tailptr: 0,
-      transactions: new Map(),
-      loads: new List(),
-      objectLoads: new List()
+      transactions: {},  // TODO: Deprecate.
+      loads: [],  // TODO: Deprecate.
+      objectLoads: []  // TODO: Deprecate
     })
     if (data) {
       if (data.tail) {
@@ -52,6 +53,7 @@ export default class DB {
         })
       }
       this.resetDiffs(data.diffs)
+      this.resetIDs(data.ids)
       this.data = this.data.set('tailptr', data.tailptr || 0)
       this.resetIndices('tail')
       this.resetHead()
@@ -77,6 +79,21 @@ export default class DB {
         return diff
       }))
     )
+  }
+
+  resetIDs(data) {
+    if (data) {
+      // TODO: This seems slow and annoying. It'll only happen once
+      //  during a rehydrate, but still. The reason for it is that
+      //  JS maps store keys as strings, but I'm using integers for
+      //  ids.
+      for (const [type, ids] of Object.entries(data)) {
+        this.data = this.data.setIn(
+          ['ids', type],
+          new Map(Object.keys(ids).map(x => [toID(x), toID(ids[x])]))
+        )
+      }
+    }
   }
 
   resetHead() {
@@ -190,8 +207,17 @@ export default class DB {
     return this.data.get('diffs').slice(0, tp)
   }
 
+  getIDTable(type) {
+    // TODO: Should ensure `ids` entry always exists in table.
+    return this.data.getIn(['ids', type], new Map())
+  }
+
+  mapID(type, id) {
+    return this.getIDTable(type).get(id, id)
+  }
+
   loadSplitObjectsSet( splitObjectsSet ) {
-    splitObjectsSet = toList( splitObjectsSet )
+    splitObjectsSet = toList(splitObjectsSet)
 
     // Unapply my outgoing diffs to make sure we don't duplicate
     // the diffs. This must be done in reverse.
@@ -199,7 +225,7 @@ export default class DB {
       this.applyDiff(diff, true, 'tail')
 
     // Load all reponse objects.
-    for( const splitObjects of splitObjectsSet ) {
+    for (const splitObjects of splitObjectsSet) {
 
       // Now update the head data state to reflect the new server
       // information.
@@ -210,10 +236,10 @@ export default class DB {
         try {
           tbl = this.getTable( type, 'tail' )
         }
-        catch( e ) {
+        catch (e) {
           // TODO: Catch specific type for missing model.
           console.warn(e)
-          return;
+          return
         }
 
         splitObjects[type].map(obj =>
@@ -266,9 +292,9 @@ export default class DB {
             const relObj = relTbl.get(rel.id)
             if (relObj !== undefined) {
               if (!tbl.model.fieldIsForeignKey(relName))
-                relTbl.addRelationship(rel.id, relName, this.getId(obj))
+                relTbl.addRelationship(rel.id, relName, makeId(obj))
               else
-                relTbl.set(relTbl.get(rel.id).set(relName, this.getId(obj)))
+                relTbl.set(relTbl.get(rel.id).set(relName, makeId(obj)))
             }
             this.saveTable(relTbl, branch)
           }
@@ -294,24 +320,8 @@ export default class DB {
     })
   }
 
-  // TODO: I think this is the same as makeId, below.
-  getId( typeOrObject, id ) {
-    if( !typeOrObject )
-      return null
-    id = makeId( typeOrObject, id )
-    return this.data.getIn( ['ids', id._type, id.id], id )
-  }
-
-  makeId( typeOrObject, id ) {
-    id = makeId( typeOrObject, id )
-    if( id._type === undefined || id.id === undefined )
-      return id
-    let res = this.data.getIn( ['ids', id._type, id.id] )
-    if( res === undefined ) {
-      this.data = this.data.setIn( ['ids', id._type, id.id], id )
-      res = id
-    }
-    return res
+  makeId(typeOrObject, id) {
+    return makeId(typeOrObject, id)
   }
 
   getModel(type, fail = false) {
@@ -332,8 +342,12 @@ export default class DB {
     this.data = this.data.setIn( [branch, table.type], table.data );
   }
 
-  toObject(data) {
-    return this.schema.toObject(data)
+  toData(data) {
+    return this.schema.toData(data, this)
+  }
+
+  toObject(data) { 
+    return this.schema.toObject(data, this)
   }
 
   toObjects( data ) {
@@ -491,28 +505,30 @@ export default class DB {
    * get( '', 3 )
    * get( '', {key: } )
    */
-  get(typeOrQuery, idOrQuery) {
-    let query, type
-    if (isEmpty(idOrQuery)) {
-      if (isEmpty(typeOrQuery))
-        return
-      type = typeOrQuery._type
-      if (Instance.isInstance(typeOrQuery) || isRecord(typeOrQuery))
-        query = {id: typeOrQuery.id}
-      else {
-        const {_type: x, ...y} = typeOrQuery
-        query = y
-      }
-    }
-    else if (isObject(idOrQuery)) {
-      type = typeOrQuery
-      query = idOrQuery
-    }
-    else {
-      type = typeOrQuery
-      query = {id: idOrQuery}
-    }
-    return this.getTable(type).get(query)
+  get(iidOrType, id) {
+    const iid = makeId(iidOrType, id)
+    return this.getTable(iid._type).get(iid.id)
+    /* let query, type
+     * if (isEmpty(idOrQuery)) {
+     *   if (isEmpty(typeOrQuery))
+     *     return
+     *   type = typeOrQuery._type
+     *   if (Instance.isInstance(typeOrQuery) || isRecord(typeOrQuery))
+     *     query = {id: typeOrQuery.id}
+     *   else {
+     *     const {_type: x, ...y} = typeOrQuery
+     *     query = y
+     *   }
+     * }
+     * else if (isObject(idOrQuery)) {
+     *   type = typeOrQuery
+     *   query = idOrQuery
+     * }
+     * else {
+     *   type = typeOrQuery
+     *   query = {id: idOrQuery}
+     * }
+     * return this.getTable(type).get(query) */
   }
 
   getOrCreate( type, query, values ) {
@@ -594,12 +610,12 @@ export default class DB {
       const field = model.getField(fieldName)
       if (field.get('many')) {
         auxDiff[fieldName] = [
-          diff[fieldName][0].filter(x => !optional.has(x)),
-          diff[fieldName][1].filter(x => !optional.has(x))
+          (diff[fieldName][0] || []).filter(x => !optional.has(x)),
+          (diff[fieldName][1] || []).filter(x => !optional.has(x))
         ]
         diff[fieldName] = [
-          diff[fieldName][0].filter(x => optional.has(x)),
-          diff[fieldName][1].filter(x => optional.has(x))
+          (diff[fieldName][0] || []).filter(x => optional.has(x)),
+          (diff[fieldName][1] || []).filter(x => optional.has(x))
         ]
       }
       else {
@@ -623,7 +639,7 @@ export default class DB {
         const diff = model.diff(tailObj, headObj)
         if (!diff)
           continue
-        const id = this.getId(headObj)
+        const id = makeId(headObj)
         const tblId = `${id._type}|${id.id}`
         tbl[tblId] = {
           id: id,
@@ -771,7 +787,7 @@ export default class DB {
       updated = existing
       for (const field of model.iterFields()) {
         if (field in partial)
-          updated = updated.set(field, partial[field])
+          updated = updated.set(field, model.toInternal(field, partial[field], this))
       }
     }
     else
@@ -786,6 +802,8 @@ export default class DB {
       // for now let's just update the head.
       this.applyDiff( diff );
     }
+
+    return updated
   }
 
   createOrUpdate( obj ) {
@@ -812,7 +830,7 @@ export default class DB {
       type = typeOrObject
     const model = this.getModel(type)
     let object = this.get(type, id)
-    id = this.getId(object)
+    id = makeId(object)
     const diff = model.diff(object, undefined)
     this.applyDiff(diff)
     this.data = this.data.update('diffs', x => x.push(diff))
@@ -827,10 +845,10 @@ export default class DB {
     this._applyDiffRelationships(diff, reverse, branch)
   }
 
-  _applyDiffRelationships( diff, reverse=false, branch='head' ) {
+  _applyDiffRelationships(diff, reverse = false, branch = 'head') {
     const ii = reverse ? 1 : 0;
     const jj = reverse ? 0 : 1;
-    const id = this.getId( getDiffId( diff ) )
+    const id = makeId( getDiffId( diff ) )
     const model = this.getModel( id._type );
     for( const field of model.iterFields() ) {
       if( diff[field] === undefined )
@@ -846,12 +864,12 @@ export default class DB {
       if( relInfo.get( 'many' ) ) {
 
         // M2Ms store the removals in 0 (ii), and the additions in 1 (jj).
-        if( diff[field][ii] !== undefined ) {
-          diff[field][ii].forEach( relId => {
-            tbl.removeRelationship( relId.id, relName, id )
+        if (!isNil(diff[field][ii])) {
+          diff[field][ii].forEach(relId => {
+            tbl.removeRelationship(relId.id, relName, id)
           });
         }
-        if( diff[field][jj] !== undefined )
+        if (!isNil(diff[field][jj]))
           diff[field][jj].forEach( relId => tbl.addRelationship( relId.id, relName, id ) )
       }
       else {
@@ -889,7 +907,7 @@ export default class DB {
     const type = getDiffId(diff)._type
     const model = this.getModel(type)
     if (model === undefined)
-      throw new ModelError(`No model of type "${type}" found during \`commitDiff\`.`);
+      throw new ModelError(`No model of type "${type}" found during \`commitDiff\`.`)
     const op = getDiffOp(diff)
     const data = model.diffToJsonApi(diff)
 
@@ -898,36 +916,36 @@ export default class DB {
       throw new ModelError(`No such operation, ${op}, defined for model type ${type}`)
 
     // Different method based on operation.
-    let promise;
+    let promise
     if (op == 'create') {
       try {
         console.debug('CREATE: ', data)
         promise = model.ops.create(data)
       }
-      catch( err ) {
-        throw new ModelError(`Failed to execute create operation for type "${type}".`);
+      catch (err) {
+        throw new ModelError(`Failed to execute create operation for type "${type}".`)
       }
     }
-    else if( op == 'update' ) {
+    else if (op == 'update') {
       try {
         console.debug('UPDATE: ', data)
         promise = model.ops.update(data.data.id, data)
       }
-      catch( err ) {
-        throw new ModelError( `Failed to execute update operation for type "${type}".` );
+      catch (err) {
+        throw new ModelError(`Failed to execute update operation for type "${type}".`)
       }
     }
-    else if( op == 'remove' ) {
+    else if (op == 'remove') {
       try {
         console.debug('REMOVE: ', data)
         promise = model.ops.remove(data.data.id)
       }
-      catch( err ) {
-        throw new ModelError( `Failed to execute remove operation for type "${type}".` );
+      catch (err) {
+        throw new ModelError(`Failed to execute remove operation for type "${type}".`)
       }
     }
     else
-      throw new ModelError( `Unknown model operation: ${op}` );
+      throw new ModelError(`Unknown model operation: ${op}`)
 
     // Add on any many-to-many values.
     // TODO: This will currently spawn an unecessary POST above if there is only
@@ -935,51 +953,58 @@ export default class DB {
     // empty and just creates a dummy promise.
     for (const field of model.iterManyToMany()) {
       if (field in diff) {
-        promise = promise.then(response => {
+        promise = promise.then(rsp => {
           if (diff[field][1] && diff[field][1].size) {
             if(!model.ops[`${field}Add`])
-              throw new ModelError( `No many-to-many add declared for ${field}.` );
-            model.ops[`${field}Add`]( data.data.id, {data: diff[field][1].toJS().map( x => ({type: x._type, id: x.id}) )} );
+              throw new ModelError(`No many-to-many add declared for ${field}.`)
+            model.ops[`${field}Add`](data.data.id, {data: diff[field][1].toJS().map(x => ({type: x._type, id: x.id}))})
           }
-          return response;
+          return rsp
         })
-        .then(response => {
-          if( diff[field][0] && diff[field][0].size ) {
-            if( !model.ops[`${field}Remove`] )
-              throw new ModelError( `No many-to-many remove declared for ${field}.` );
-            model.ops[`${field}Remove`]( data.data.id, {data: diff[field][0].toJS().map( x => ({type: x._type, id: x.id}) )} );
+        .then(rsp => {
+          if (diff[field][0] && diff[field][0].size) {
+            if (!model.ops[`${field}Remove`])
+              throw new ModelError(`No many-to-many remove declared for ${field}.`)
+            model.ops[`${field}Remove`](data.data.id, {data: diff[field][0].toJS().map(x => ({type: x._type, id: x.id}))})
           }
-          return response;
-        });
+          return rsp
+        })
       }
     }
 
     // Note that popping the diff from the set is done in `postCommitDiff`.
 
-    return promise;
+    return promise
   }
 
   postCommitDiff(response, diff) {
-    return executionTime(() => {
 
-      // If no diff was supplied, operate on the first in the queue,
-      // including unshifting it and updating the tail pointer.
-      if (!diff) {
-        diff = this.data.getIn(['diffs', 0])
-        this.data = this.data.update('diffs', x => x.shift())
-        this.data = this.data.update('tailptr', x => x -= 1)
-      }
+    // If no diff was supplied, operate on the first in the queue,
+    // including unshifting it and updating the tail pointer.
+    if (!diff) {
+      diff = this.data.getIn(['diffs', 0])
+      this.data = this.data.update('diffs', x => x.shift())
+      this.data = this.data.update('tailptr', x => x -= 1)
+    }
 
-      // If we've created an object, perform a reId.
-      if (getDiffOp(diff) == 'create') {
-        const {data} = response
-        const id = toArray(data)[0].id
-        this.reId(diff._type[1], diff.id[1], id)
-        return true
-      }
+    // If we've created a new resource, keep track of the official
+    // identifier in the temporary mapping table.
+    if (getDiffOp(diff) == 'create') {
+      const {data} = response
+      const type = getDiffType(diff)
+      const fromID = toID(toArray(data)[0].id)
+      const _toID = diff.id[1]
+      this.data = this.data.updateIn(
+        ['ids', type],
+        x => {
+          if (!x) x = new Map()
+          return x.set(fromID, _toID)
+        }
+      )
+      return true
+    }
 
-      return false
-    }, 'postCommitDiff')
+    return false
   }
 
   /**
@@ -1051,11 +1076,11 @@ export default class DB {
         for( const field of relModel.iterForeignKeys() ) {
           if( diff[field] ) {
             newDiff[field] = [diff[field][0], diff[field][1]]
-            if(diff[field][0] && fromId.equals(this.getId(diff[field][0]))) {
+            if(diff[field][0] && fromId.equals(makeId(diff[field][0]))) {
               newDiff[field][0] = toId
               changed = true
             }
-            if(diff[field][1] && fromId.equals(this.getId(diff[field][1]))) {
+            if(diff[field][1] && fromId.equals(makeId(diff[field][1]))) {
               newDiff[field][1] = toId
               changed = true
             }

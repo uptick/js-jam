@@ -1,6 +1,6 @@
 import {Set} from 'immutable'
 
-import {ID, negate} from './utils'
+import {ID, isEmpty, makeId, negate} from './utils'
 
 const operations = {
 
@@ -36,6 +36,22 @@ class Filter {
     if (!Filter.isFilter(obj))
       return obj
     return obj.toBasic()
+  }
+
+  static toFilter(obj) {
+    let op
+    if (Number.isInteger(obj))
+      op = operations.eq('id', obj)
+    else {
+      for (const [k, v] of Object.entries(obj)) {
+        let newOp = operations.eq(k, v)
+        if (!op)
+          op = newOp
+        else
+          op = operations.and(op, newOp)
+      }
+    }
+    return op
   }
 
   constructor(op, left, right) {
@@ -112,6 +128,15 @@ class BasicVisitor extends Visitor {
     }
   }
 
+  in(filter, field, value) {
+    // TODO: This needs to go elsewhere.
+    if (value instanceof ID)
+      value = value.id
+    return {
+      [`${field}_in`]: value
+    }
+  }
+
   and(filter, left, right) {
     return {
       ...left.execute(this),
@@ -135,15 +160,34 @@ class DBVisitor extends Visitor {
     return this.table._mapIndices(filter.execute(this))
   }
 
+  /**
+   * Used for mapping IDs after a create.
+   */
+  mapValue(record, fldName, value) {
+    if (fldName == 'id')
+      return this.db.mapID(record._type, value)
+    else if (value) {
+      // TODO: Is duck typing the best option?
+      const type = value._type
+      const id = value.id
+      if (!isEmpty(type) && !isEmpty(id))
+        return makeId(type, this.db.mapID(type, id))
+    }
+    return value
+  }
+
   eq(filter, field, value) {
     return this._filter(field, (rec, fldName) => {
-      return this.db.getModel(rec._type).equals(fldName, rec[fldName], value)})
+      let v = this.mapValue(rec, fldName, value)
+      return this.db.getModel(rec._type).equals(fldName, rec[fldName], v)
+    })
   }
 
   ['in'](filter, field, value) {
-    return this._filter(field, (rec, fldName) =>
-      this.db.getModel(rec._type).includes(fldName, rec[fldName], value)
-    )
+    return this._filter(field, (rec, fldName) => {
+      let v = this.mapValue(rec, fldName, value)
+      return this.db.getModel(rec._type).includes(fldName, rec[fldName], v)
+    })
   }
 
   and(filter, left, right) {
