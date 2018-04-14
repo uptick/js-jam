@@ -3,8 +3,16 @@
 [![npm version](https://badge.fury.io/js/redux-jam.svg)](http://badge.fury.io/js/redux-jam)
 ![Downloads](http://img.shields.io/npm/dm/redux-jam.svg?style=flat)
 
-`redux-jam` aims to make interacting with relational database based APIs
-easier and more powerful.
+`redux-jam` is a framework for managing the complexity of multiple data
+sources with different fetching and storage characteristics, while using
+standard, flexible, and known systems, such as Redux.
+
+Storing data fetched from a server locally is a very attractive method of
+improving user experience, but it comes with significant difficulties.
+Deciding when to invalidate a locally cached dataset, and how to combine
+remote and local data can be a source of immense complexity. This is
+especially true when building an application designed for offline
+capabilities.
 
 ## Installation
 
@@ -69,13 +77,14 @@ a JSON-API object. Take for example the following definition of a movie:
       name: {
         required: true        
       },
-      duration: {}
+      duration: {},
+      year: {}
     },
     relationships: {
       actors: {
         type: "person",
         many: true,
-        relatedName: "acted_in"
+        relatedName: "actedIn"
       }
     }
     api: {
@@ -127,6 +136,68 @@ automatically, which is particularly convenient.
 Refer to [Django-JAM](https://github.com/ABASystems/django-jam)
 
 ## Loading Data
+
+Fetching data from the server is achieved with a higher order comonent,
+`withView`. Views collect a set of one or more queries and provide the
+resultant data to a React component.
+
+The following snippet shows a React component that loads movies whose
+title contains the term "Rocky", and sorts them on year:
+
+```js
+import React from 'react'
+import {withView} from 'redux-jam'
+import schema from 'models'
+
+const view = schema.view({
+  name: 'movieList',
+  queries: {
+    movies: {
+      type: 'movie',
+      filter: F.contains('title', 'Rocky'),
+      sort: 'year'
+    }
+  }
+})
+
+@withView(view)
+class MoviesList extends React.Component {
+  render() {
+    const {moviesList} = this.props
+    const {loading, queries} = moviesList
+    if (!loading) {
+      return (
+        <ul>
+          {queries.movies.map(m => <li>{m.title}</li>}
+        </ul>
+      )
+    }
+    else
+      return null
+  }
+}
+```
+
+## Mutating data
+
+`redux-jam` provides a form like interface for mutating data.
+
+```js
+import React from 'react'
+import {withForm} from 'redux-jam'
+import schema from 'models'
+
+@withForm({type: 'movie'})
+class MoviesList extends React.Component {
+  render() {
+    const {renderField} = this.props
+    // TODO
+  }
+}
+```
+
+## Filtering
+
 
 
 ## Transactions

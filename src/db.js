@@ -1044,6 +1044,10 @@ export default class DB {
       const {data} = response
       const type = getDiffType(diff)
       const fromID = toID(toArray(data)[0].id)
+      if (isEmpty(fromID)) {
+        console.warn('Invalid response to create: no ID returned.')
+        return false
+      }
       const _toID = diff.id[1]
       this.data = this.data.updateIn(
         ['ids', type],

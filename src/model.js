@@ -475,7 +475,7 @@ export default class Model {
   diffToJsonApi(diff, db) {
     let data = {
       type: diff._type[1],
-      id: diff.id[1],
+      id: db.unmapID(diff._type[1], diff.id[1]),
       attributes: {},
       relationships: {}
     }

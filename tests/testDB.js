@@ -260,6 +260,7 @@ describe('DB', function() {
 
         describe('in pushes to remote', function() {
           let createStub
+          let updateStub
           let addStub
 
           beforeEach(function() {
@@ -267,6 +268,8 @@ describe('DB', function() {
             db.schema.models.get('person').ops.create = createStub
             addStub = sinon.stub()
             db.schema.models.get('person').ops.ownsAdd = addStub
+            updateStub = sinon.stub()
+            db.schema.models.get('movie').ops.update = updateStub
           })
 
           afterEach(() => {
@@ -274,7 +277,14 @@ describe('DB', function() {
           })
 
           it('with mapped ID', function() {
-            // TODO
+            let db2 = fixture.schema.db()
+            let m = db2.create2('movie', {})
+            db2.commit()
+            db2.update(m, {title: 'Something else'})
+            db2.commit()
+            db2.postCommitDiff({data: {id: 1001, type: 'movie'}})
+            db2.commitDiff()
+            expect(updateStub.getCall(0).args[1].data.id).to.equal(1001)
           })
 
           it('with foreign-keys', function() {
