@@ -24,7 +24,6 @@ function * loadModelView(action) {
     // the DOM. Perform a sequence of quick local queries first,
     // which we will send in with the request payload.
     // TODO: Need to disable this if remote only query.
-    console.log('Performing local prequery.')
     let results = {}
     let mappedQueries = {}
     for (const queryName of Object.keys(queries)) {
@@ -45,18 +44,15 @@ function * loadModelView(action) {
     let meta = {}
 
     // A place to hold the JSON responses to be loaded.
-    /* let jsonData = [] */
+    let jsonData = []
 
     // Process each named query. We want to load the data, cache it
     // in results, then update the store immediately.
     for (const queryName of Object.keys(queries)) {
-      console.debug(`loadModelView: Looking up "${name}.${queryName}"`)
       let query = mappedQueries[queryName]
-      let data = yield call([db, db.query], query)
+      let data = yield call([db, db.query], {...query, json: true})
       if (data)
-        results[queryName] = data
-      else
-        results[queryName] = null
+        jsonData.push(data)
     }
 
     // TODO: I don't think I need this. Clearing can be nice to keep things
@@ -67,32 +63,41 @@ function * loadModelView(action) {
     // yield put( {type: 'MODEL_CLEAR', payload: {schema}} )
 
     // Merge in the loaded data and wait for it to be finished.
-    /* if( jsonData.length > 0 ) {
-     *   yield put( {type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}} )
-     *   yield take(
-     *     action => {
-     *       return (
-     *         action.type == 'MODEL_LOAD_JSON_DONE'
-     *         && action.payload
-     *         && action.payload.jsonData == jsonData
-     *       )
-     *     }
-     *   )
-     * } */
+    if (jsonData.length > 0) {
+      yield put({type: 'MODEL_LOAD_JSON', payload: {schema, jsonData}})
+      yield take(
+        action => {
+          return (
+            action.type == 'MODEL_LOAD_JSON_DONE' &&
+            action.payload &&
+            action.payload.jsonData == jsonData
+          )
+        }
+      )
+    }
 
-    yield put({ type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta} })
+    // Once we have our redux DB up to date, we can run local queries.
+    for (const queryName of Object.keys(queries)) {
+      let query = mappedQueries[queryName]
+      let data = yield call([db, db.localQuery], query)
+      if (data)
+        results[queryName] = data
+      else
+        results[queryName] = null
+    }
+
+    yield put({type: 'MODEL_LOAD_VIEW_SUCCESS', payload: {name, results, meta}})
   }
-  catch( e ) {
-    console.error( e )
-    yield put({ type: 'MODEL_LOAD_VIEW_FAILURE', errors: e.message })
+  catch (e) {
+    console.error(e)
+    yield put({type: 'MODEL_LOAD_VIEW_FAILURE', errors: e.message})
   }
 }
 
 /**
  * Synchronise the current DB against the server.
  */
-function * sync(action) {
-  console.debug('JAM: Synchronising.')
+export function * sync(action) {
   const {schema} = action.payload
   try {
     yield put({type: 'MODEL_SYNC_REQUEST'})
@@ -102,7 +107,7 @@ function * sync(action) {
       const state = yield select()
       const db = schema.db(state.model.db)
       const rsp = yield call([db, db.commitDiff])
-      if (!rsp)
+      if (rsp == 'done')
         break
 
       // I'll be the only one sending post commit diffs, so I can wait for
@@ -269,6 +274,7 @@ function * loadJson(payload) {
         // TODO: For some reason exceptions don't get propagated
         // from within this call. No idea why...
         db.loadJsonApi(data)
+        persistToLocalStorage({db, force: true})
       }
     }
   )
@@ -323,7 +329,7 @@ export function * mutationSerializer(action) {
       yield call(postCommitDiff, action.payload)
       break
     case 'MODEL_LOAD_JSON':
-      yield call( loadJson, action.payload )
+      yield call(loadJson, action.payload)
       break
     case 'MODEL_CLEAR':
       yield call( clear, action.payload )

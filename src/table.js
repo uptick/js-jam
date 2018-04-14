@@ -111,7 +111,6 @@ export default class Table {
       const visitor = new DBVisitor(this.db, this.type)
       results = visitor.execute(idOrQuery)
     }
-    /* results = this._mapIndices(this._filterIndices(idOrQuery)) */
     return results
   }
 
@@ -120,123 +119,6 @@ export default class Table {
    */
   _mapIndices(indices) {
     return indices.map(ii => this.data.getIn(['objects', ii]))
-  }
-
-  /**
-   * Filter objects based on a query, returning the indices.
-   */
-  _filterIndices(idOrQuery, options) {
-    if (!isObject(idOrQuery))
-      idOrQuery = {[this.idField]: idOrQuery}
-    const {not} = options || {}
-    let results
-    for (const field in idOrQuery) {
-      let value = this.model.toInternal(field, idOrQuery[field])
-
-      // What kind of query are we looking at? If there's a double
-      // underscore somewhere it's something more fancy.
-      let match = field.match(Table.filterRegex)
-      if (match !== null) {
-        switch(match[2].toLowerCase()) {
-
-          // TODO: Sooo much optimisation here. These filters should be easy to
-          //  write and much more efficient.
-
-          // Lookup based on a string containing a value.
-          case 'contains':
-            results = this._reduceIndices( results, () =>
-              // TODO: This is a bit annoying, having to conver to a Set.
-              // TODO: Also, what about data types? Should fail nicely if no 'includes'
-              new Set( this.data
-                           .get( 'objects' )
-                           .map((v, k) => {
-                             v = v.get(match[1])
-                             return negate((v !== null) ? v.includes(value) : false, not) ? k : undefined // TODO: Check if field exists.
-                           })
-                           .filter( v => v !== undefined ) )
-            )
-            break
-
-          case 'isnull':
-            results = this._reduceIndices(results, () =>
-              // TODO: This is a bit annoying, having to conver to a Set.
-              new Set( this.data
-                           .get('objects')
-                           .map((v, k) => {
-                             // TODO: Better manage types.
-                             if (this.model.fieldIsManyToMany(match[1]))
-                               return negate(v.get(match[1]).size == 0, not) ? k : undefined
-                             else
-                               return negate(isEmpty(v.get(match[1])), not) ? k : undefined // TODO: Check if field exists.
-                           })
-                           .filter(v => v !== undefined))
-            )
-            break
-
-          case 'in':
-            results = this._reduceIndices( results, () =>
-              // TODO: This is a bit annoying, having to conver to a Set.
-              new Set( this.data
-                           .get( 'objects' )
-                           .map( (v, k) => negate( v.get( match[1] ).has( value ), not ) ? k : undefined )
-                           .filter( v => v !== undefined ) )
-            )
-            break
-
-          default:
-            throw new ModelError( `Unknown filter: ${match[2]}` )
-        }
-      }
-
-      // No double slash means we can perform an exact lookup. Currently
-      // this only works for fields with an index.
-      else {
-        results = this._reduceIndices(results, () => {
-          const index = this.data.getIn(['indices', field])
-          if (index === undefined) {
-            console.warn(`Table index not found for type "${field}", will be inefficient.`)
-            // TODO: This is a bit annoying, having to conver to a Set.
-            return new Set(this.data
-                               .get('objects')
-                               .map((v, k) => negate(this.model.equals(field, v.get(field), value), not) ? k : null)
-                               .filter(v => v !== null))
-          }
-          else {
-            let r = index.get(this.toIndexable(field, value))
-            if( not ) {
-              let r2 = new Set()
-              for( let ii = 0; ii < this.data.get( 'objects' ).size; ++ii ) {
-                if( !r.has( ii ) )
-                  r2 = r2.add( ii )
-              }
-              r = r2
-            }
-            return r
-          }
-        })
-      }
-    }
-
-    return results
-  }
-
-  /**
-   * Calculate overlapping indices based on a field/value lookup.
-   */
-  _reduceIndices(indices, getOtherIndices) {
-    const other = getOtherIndices()
-    /* const index = this.data.getIn( ['indices', field] )
-     * if( index === undefined ) {
-     *   throw new ModelError( `Table index not found: ${field}` )
-     * }
-     * const other = index.get( this.toIndexable( field, value ) )*/
-    if( other === undefined ) {
-      return new Set()
-    }
-    if( indices === undefined ) {
-      return other
-    }
-    return indices.intersect( other )
   }
 
   set(object) {
@@ -332,13 +214,6 @@ export default class Table {
       this.data = this.data.update('objects', x => x.slice(0, -1))
     else
       this.data = this.data.setIn(['objects', index], null)
-  }
-
-  reId(oldId, newId) {
-    const index = this._getIndex(oldId)
-    this.data = this.data
-                    .setIn(['indices', this.idField, this.toIndexable(this.idField, newId)], new Set([index]))
-                    .setIn(['objects', index, this.idField], newId)
   }
 
   /**

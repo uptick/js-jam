@@ -6,8 +6,8 @@ export * from './sagas/utils'
 import saga from './sagas'
 export {saga}
 
-import {toArray, collectJsonApi} from './utils'
-export {toArray, collectJsonApi}
+import {toArray, collectJsonApi, isEmpty, toID, makeId} from './utils'
+export {toArray, collectJsonApi, isEmpty, toID, makeId}
 
 export * from './actions'
 import {createAction} from './actions/utils'

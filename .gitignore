@@ -35,3 +35,4 @@ node_modules
 lib
 example/bundle.js
 **~
+tests/backup.tgz

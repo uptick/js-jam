@@ -123,7 +123,7 @@ export default class Model {
 
             // Without a DB object the best we can do is return the
             // ID of the foreign-key.
-            if(!this._db)
+            if (!this._db)
               return value
 
             // TODO: Use db.get once I've converted it.
@@ -287,23 +287,23 @@ export default class Model {
       yield x
   }
 
-  *iterAttributes() {
-    for(const x of this.attributes.keys())
+  * iterAttributes() {
+    for (const x of this.attributes.keys())
       yield x
   }
 
-  *iterRelationships( opts ) {
-    for( const x of this.iterForeignKeys( opts ) )
+  * iterRelationships(opts) {
+    for (const x of this.iterForeignKeys(opts))
       yield x
-    for( const x of this.iterManyToMany( opts ) )
+    for (const x of this.iterManyToMany(opts))
       yield x
   }
 
-  *iterManyToMany( opts ) {
-    const { includeReverse = false } = opts || {}
-    for( const field of this.relationships.keys() ) {
-      if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
-          || !this.relationships.getIn( [field, 'many'] ) )
+  * iterManyToMany(opts) {
+    const {includeReverse = false} = opts || {}
+    for (const field of this.relationships.keys()) {
+      if ((!includeReverse && this.relationships.getIn([field, 'reverse']))
+          || !this.relationships.getIn([field, 'many']))
       {
         continue
       }
@@ -311,8 +311,8 @@ export default class Model {
     }
   }
 
-  *iterForeignKeys( opts ) {
-    const { includeReverse = false } = opts || {}
+  * iterForeignKeys(opts) {
+    const {includeReverse = false} = opts || {}
     for( const field of this.relationships.keys() ) {
       if( (!includeReverse && this.relationships.getIn( [field, 'reverse'] ))
           || this.relationships.getIn( [field, 'many'] ) )
@@ -328,11 +328,11 @@ export default class Model {
     return fld !== undefined
   }
 
-  fieldIsForeignKey( field ) {
-    const info = this.relationships.get( field )
-    if( info === undefined )
+  fieldIsForeignKey(field) {
+    const info = this.relationships.get(field)
+    if (info === undefined)
       return false
-    return !info.get( 'many' )
+    return !info.get('many')
   }
 
   fieldIsManyToMany( field ) {
@@ -431,7 +431,7 @@ export default class Model {
       // Creation.
       if (isEmpty(diff._type[ii])) {
         if (!isEmpty(rec))
-          throw new ModelError('Trying to create an object that already exists.')
+          throw new ModelError(`Trying to create an object that already exists, "${rec._type}" and "${rec.id}".`)
         let data = {}
         Object.keys(diff).forEach(x => data[x] = diff[x][jj])
         rec = this.toObject(data, db)
@@ -472,7 +472,7 @@ export default class Model {
     return rec
   }
 
-  diffToJsonApi(diff) {
+  diffToJsonApi(diff, db) {
     let data = {
       type: diff._type[1],
       id: diff.id[1],
@@ -482,19 +482,19 @@ export default class Model {
     const op = getDiffOp(diff)
     if (op == 'remove') {
       data.type = diff._type[0]
-      data.id = diff.id[0]
+      data.id = db.unmapID(data.type, diff.id[0])
     }
     for (const fldName of this.iterAttributes()) {
       if (fldName in diff) {
         const fld = this.getField(fldName)
-        data.attributes[fldName] = Field.fromInternal(fld.get('type'), diff[fldName][1])
+        data.attributes[fldName] = Field.fromInternal(fld.get('type'), diff[fldName][1], db)
       }
     }
     for (const fldName of this.iterForeignKeys()) {
       if (fldName in diff) {
         const v = diff[fldName][1]
         data.relationships[fldName] = {
-          data: v ? {type: v._type, id: v.id} : null
+          data: v ? {type: v._type, id: db.unmapID(v._type, v.id)} : null
         }
       }
     }

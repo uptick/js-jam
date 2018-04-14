@@ -53,7 +53,6 @@ function configure(env) {
           uglifyOptions: {
             compress: {
               pure_funcs: [
-                'console.log',
                 'console.debug'
               ]
             }

@@ -125,9 +125,14 @@ export default class DB {
       })
   }
 
-  bindDispatch( dispatch ) {
-    this.dispatch = dispatch
-    this.actions = bindActionCreators( modelActions, dispatch )
+  rebase(base, offset = 0) {
+    const db = base.copy()
+    let diffs = this.getLocalDiffs()
+    if (offset)
+      diffs = diffs.slice(offset)
+    db.data = db.data.update('diffs', x => x.concat(diffs))
+    db.resetHead()
+    return db
   }
 
   /**
@@ -214,6 +219,14 @@ export default class DB {
 
   mapID(type, id) {
     return this.getIDTable(type).get(id, id)
+  }
+
+  unmapID(type, id) {
+    // TODO: Efficiency is baaaad with this one.
+    let r = this.getIDTable(type).findKey(x => x == id)
+    if (r === undefined)
+      r = id
+    return r
   }
 
   loadSplitObjectsSet( splitObjectsSet ) {
@@ -403,29 +416,35 @@ export default class DB {
       if (!rec)
         return
       rec = this.get(rec)
+      if (!rec)
+        return
       const f = flds[0]
       if (flds.length > 1) {
         const model = this.getModel(rec._type)
         if (model.fieldIsForeignKey(f)) {
-          for (const r of _iter(rec[f], flds.slice(1)))
+          for (const r of _iter(rec[f], flds.slice(1))) {
             yield r
+          }
         }
         else if (model.fieldIsManyToMany(f)) {
           for (const n of rec[f])
-            for (const r of _iter(n, flds.slice(1)))
+            for (const r of _iter(n, flds.slice(1))) {
               yield r
+            }
         }
         else
           throw new ModelError(`Cannot lookup non-related field.`)
       }
-      else
+      else {
         yield [rec, f]
+      }
     }.bind(this)
 
     if (!isArray(field))
       field = field.split('__')
-    for (const r of _iter(record, field))
+    for (const r of _iter(record, field)) {
       yield r
+    }
   }
 
   lookupFirstValue(record, field) {
@@ -435,19 +454,22 @@ export default class DB {
   }
 
   query(options) {
-    const {policy = this.policy, ...other} = options
+    const {policy = this.policy, json = false, ...other} = options
     let result
     if (policy == 'remoteOnly')
-      result = this.remoteQuery(other)
-    else if (policy == 'local')
+      result = this.remoteQuery({...other, json})
+    else if (policy == 'local' && !json)
       result = this.localQuery(other)
-    else
-      result = this.remoteQuery(other)
-                   .then(() => this.localQuery(other))
+    else {
+      result = this.remoteQuery({...other, json})
+      if (!json)
+        result = result.then(() => this.localQuery(other))
+    }
     return result
   }
 
   async remoteQuery(options) {
+    console.debug('Running remote query.')
     const {
       type,
       id,
@@ -455,6 +477,7 @@ export default class DB {
       filter,
       sort,
       returnType = 'instance',
+      json = false,
       ...other
     } = options
 
@@ -467,22 +490,27 @@ export default class DB {
 
     // Call the operation.
     const opts = {filter: Filter.toBasic(filter), sort, ...other}
-    let result
+    let jsonData
     if (!isEmpty(id))
-      result = await op(id, opts)
+      jsonData = await op(id, opts)
     else
-      result = await op(opts)
+      jsonData = await op(opts)
+    if (json)
+      return jsonData
 
     // Load the result into the DB and map IDs.
-    this.loadJsonApi(result)
-    if (Array.isArray(result.data)) {
-      result = result.data.map(x => makeId(x.type, x.id))
+    // TODO: This is an efficiency problem. The load is done once here, then
+    //  again in the saga.
+    this.loadJsonApi(jsonData)
+    let result
+    if (Array.isArray(jsonData.data)) {
+      result = jsonData.data.map(x => makeId(x.type, x.id))
       if (returnType === 'instance')
         result = result.map(x => this.getInstance(x))
       result = new List(result)
     }
     else {
-      result = makeId(result.data.type, result.data.id)
+      result = makeId(jsonData.data.type, jsonData.data.id)
       if (returnType == 'instance')
         result = this.getInstance(result)
     }
@@ -491,6 +519,7 @@ export default class DB {
   }
 
   localQuery(options) {
+    console.log('Running local query.')
     const {type, filter, sort, ...other} = options
     let results = this.filter(type, filter, other)
     if (sort)
@@ -507,6 +536,8 @@ export default class DB {
    */
   get(iidOrType, id) {
     const iid = makeId(iidOrType, id)
+    if (!iid)
+      return null
     return this.getTable(iid._type).get(iid.id)
     /* let query, type
      * if (isEmpty(idOrQuery)) {
@@ -708,19 +739,19 @@ export default class DB {
     let newDiffs = []
     for( let diff of diffs ) {
       let extraDiffs = []
-      const id = getDiffId( diff )
-      const model = this.getModel( diff._type[0] || diff._type[1] )
-      for( const fieldName of model.iterManyToMany() ) {
-        if( !diff[fieldName] )
+      const id = getDiffId(diff)
+      const model = this.getModel(diff._type[0] || diff._type[1])
+      for (const fieldName of model.iterManyToMany()) {
+        if (!diff[fieldName])
           continue
-        if( diff[fieldName][0] && diff[fieldName][0].size ) {
+        if (diff[fieldName][0] && diff[fieldName][0].size) {
           extraDiffs.push({
             _type: [id._type, id._type],
             id: [id.id, id.id],
             [fieldName]: [diff[fieldName][0], new OrderedSet()]
           })
         }
-        if( diff[fieldName][1] && diff[fieldName][1].size ) {
+        if (diff[fieldName][1] && diff[fieldName][1].size) {
           extraDiffs.push({
             _type: [id._type, id._type],
             id: [id.id, id.id],
@@ -744,7 +775,7 @@ export default class DB {
     // should be discarded, as the new diffs represent the compacted
     // version of those. The tail pointer should also be updated to
     // the new location.
-    console.debug(`DB: Committing ${newDiffs.length} new diff(s)`)
+    console.debug(`Committing ${newDiffs.length} new diff(s)`)
     const tp = this.data.get('tailptr')
     this.data = this.data.update('diffs', x => x.slice(0, tp).concat(newDiffs))
     this.data = this.data.update('tailptr', x => x + newDiffs.length)
@@ -837,7 +868,6 @@ export default class DB {
   }
 
   applyDiff(diff, reverse = false, branch = 'head') {
-    console.debug((reverse ? 'Unapplying' : 'Applying')  + ' diff: ', diff)
     const id = getDiffId(diff)
     let tbl = this.getTable(id._type, branch)
     tbl.applyDiff(diff, reverse)
@@ -898,8 +928,9 @@ export default class DB {
     // If no such diff is available then return.
     if (!diff) {
       diff = this.getOutgoingDiffs().get(0)
-      if(!diff)
-        return
+      if (!diff) {
+        return 'done'
+      }
     }
 
     // Find the model, convert data to JSON API, and send using
@@ -909,17 +940,15 @@ export default class DB {
     if (model === undefined)
       throw new ModelError(`No model of type "${type}" found during \`commitDiff\`.`)
     const op = getDiffOp(diff)
-    const data = model.diffToJsonApi(diff)
-
-    // Check for valid operation.
-    if (!model.ops || model.ops[op] === undefined)
-      throw new ModelError(`No such operation, ${op}, defined for model type ${type}`)
+    const data = model.diffToJsonApi(diff, this)
+    console.debug('Pushing diff: ', diff)
 
     // Different method based on operation.
     let promise
     if (op == 'create') {
+      if (!model.ops || model.ops[op] === undefined)
+        throw new ModelError(`No such operation, ${op}, defined for model type ${type}`)
       try {
-        console.debug('CREATE: ', data)
         promise = model.ops.create(data)
       }
       catch (err) {
@@ -927,17 +956,31 @@ export default class DB {
       }
     }
     else if (op == 'update') {
-      try {
-        console.debug('UPDATE: ', data)
-        promise = model.ops.update(data.data.id, data)
+
+      // Don't try and send an update if the change is purely M2M.
+      let doUpdate = true
+      for (const f of model.iterManyToMany()) {
+        if (!isNil(diff[f])) {
+          doUpdate = false
+          break
+        }
       }
-      catch (err) {
-        throw new ModelError(`Failed to execute update operation for type "${type}".`)
+
+      if (doUpdate) {
+        if (!model.ops || model.ops[op] === undefined)
+          throw new ModelError(`No such operation, ${op}, defined for model type ${type}`)
+        try {
+          promise = model.ops.update(data.data.id, data)
+        }
+        catch (err) {
+          throw new ModelError(`Failed to execute update operation for type "${type}".`)
+        }
       }
     }
     else if (op == 'remove') {
+      if (!model.ops || model.ops[op] === undefined)
+        throw new ModelError(`No such operation, ${op}, defined for model type ${type}`)
       try {
-        console.debug('REMOVE: ', data)
         promise = model.ops.remove(data.data.id)
       }
       catch (err) {
@@ -947,28 +990,36 @@ export default class DB {
     else
       throw new ModelError(`Unknown model operation: ${op}`)
 
-    // Add on any many-to-many values.
-    // TODO: This will currently spawn an unecessary POST above if there is only
-    // many-to-many updates. Add a bit to the above that checks if the update is
-    // empty and just creates a dummy promise.
-    for (const field of model.iterManyToMany()) {
-      if (field in diff) {
-        promise = promise.then(rsp => {
+    // Update M2M values. Remember that M2Ms are split out individually
+    // from primary diffs, meaning we'll only get one at a time.
+    if (isNil(promise)) {
+      for (const field of model.iterManyToMany()) {
+        if (field in diff) {
           if (diff[field][1] && diff[field][1].size) {
             if(!model.ops[`${field}Add`])
-              throw new ModelError(`No many-to-many add declared for ${field}.`)
-            model.ops[`${field}Add`](data.data.id, {data: diff[field][1].toJS().map(x => ({type: x._type, id: x.id}))})
+              throw new ModelError(`No many-to-many add declared for field "${field}".`)
+            promise = model.ops[`${field}Add`](
+              data.data.id,
+              {
+                data: diff[field][1].toJS().map(
+                  x => ({type: x._type, id: this.unmapID(x._type, x.id)})
+                )
+              }
+            )
           }
-          return rsp
-        })
-        .then(rsp => {
-          if (diff[field][0] && diff[field][0].size) {
+          else if (diff[field][0] && diff[field][0].size) {
             if (!model.ops[`${field}Remove`])
-              throw new ModelError(`No many-to-many remove declared for ${field}.`)
-            model.ops[`${field}Remove`](data.data.id, {data: diff[field][0].toJS().map(x => ({type: x._type, id: x.id}))})
+              throw new ModelError(`No many-to-many remove declared for field "${field}".`)
+            promise = model.ops[`${field}Remove`](
+              data.data.id,
+              {
+                data: diff[field][0].toJS().map(
+                  x => ({type: x._type, id: this.unmapID(x._type, x.id)})
+                )
+              }
+            )
           }
-          return rsp
-        })
+        }
       }
     }
 
@@ -1005,104 +1056,6 @@ export default class DB {
     }
 
     return false
-  }
-
-  /**
-   * Change the ID of an object.
-   *
-   * This is actually a great big jerk. We need to lookup all references
-   * to this object across *everything* and change the identifier.
-   *
-   * NOTE: We can't remove the old ID straight away, as there are cases
-   *       where other components still need to reference it.
-   */
-  reId(type, id, newId, branch) {
-    console.debug(`DB: reId: New ID for ${type}, ${id}: ${newId}`)
-
-    // If no branch was given, do both.
-    if( branch === undefined )
-      branch = ['head', 'tail']
-    else
-      branch = [branch]
-
-    // Perform the reId on both branches.
-    for (const br of branch) {
-      console.debug('Looking at branch: ', br)
-
-      // Update the ID of the object itself.
-      let tbl = this.getTable(type, br)
-      tbl.reId(id, newId)
-      this.saveTable(tbl, br)
-
-      // Now update the relationships.
-      console.debug('Updating relationships.')
-      const model = this.getModel(type)
-      const fromId = this.makeId(type, id)
-      const toId = this.makeId(type, newId)
-      tbl.forEachRelatedObject(newId, (objId, reverseField) => {
-        if (!reverseField)
-          return
-        console.debug('Looking at related object with "id" "reverse field": ', objId.toJS(), reverseField)
-        const obj = this.get(objId)
-        const relTbl = this.getTable(obj._type, br)
-        const relModel = relTbl.model
-        if (!relModel.fieldIsForeignKey(reverseField)) {
-          relTbl.removeRelationship(obj.id, reverseField, fromId)
-          relTbl.addRelationship(obj.id, reverseField, toId)
-        }
-        else
-          relTbl.set( obj.set( reverseField, toId ) );
-        this.saveTable( relTbl, br );
-      });
-
-      // Finally, update any references in diffs.
-      // TODO: This is slow and shit.
-      const diffs = this.data.getIn( ['diffs'] );
-      for( let ii = 0; ii < diffs.size; ++ii ) {
-        const diff = diffs.get( ii );
-        let newDiff = {
-          id: [diff.id[0], diff.id[1]]
-        };
-        let changed = false;
-        if( diff.id[0] == id ) {
-          newDiff.id[0] = newId;
-          changed = true;
-        }
-        if( diff.id[1] == id ) {
-          newDiff.id[1] = newId;
-          changed = true;
-        }
-        const relModel = this.getModel( getDiffId( diff )._type )
-        for( const field of relModel.iterForeignKeys() ) {
-          if( diff[field] ) {
-            newDiff[field] = [diff[field][0], diff[field][1]]
-            if(diff[field][0] && fromId.equals(makeId(diff[field][0]))) {
-              newDiff[field][0] = toId
-              changed = true
-            }
-            if(diff[field][1] && fromId.equals(makeId(diff[field][1]))) {
-              newDiff[field][1] = toId
-              changed = true
-            }
-          }
-        }
-        for( const field of relModel.iterManyToMany() ) {
-          if( diff[field] ) {
-            newDiff[field] = [diff[field][0], diff[field][1]];
-            if( newDiff[field][0] && newDiff[field][0].has( fromId ) ) {
-              newDiff[field][0] = newDiff[field][0].delete( fromId ).add( toId );
-              changed = true;
-            }
-            if( newDiff[field][1] && newDiff[field][1].has( fromId ) ) {
-              newDiff[field][1] = newDiff[field][1].delete( fromId ).add( toId );
-              changed = true;
-            }
-          }
-        }
-        if( changed )
-          this.data = this.data.updateIn( ['diffs', ii], x => Object( {...x, ...newDiff} ) );
-      }
-    }
   }
 
   startTransaction( name ) {

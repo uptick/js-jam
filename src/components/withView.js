@@ -10,7 +10,7 @@ import DB from '../db'
  * Higher-order component to automatically insert models loaded
  * from a server.
  */
-export default options => {
+export default (options = {}) => {
 
   /**
    * Connect the wrapper component to the model state.
@@ -84,7 +84,7 @@ export default options => {
         // true in our props, and we actually have a query in the
         // options.
         if (!props.delayLoad && options.queries) {
-          console.debug('Loading JAM view.')
+          console.debug('Loading view.')
           props.loadModelView({...options, props, params})
         }
       }

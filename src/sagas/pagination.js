@@ -2,7 +2,7 @@ import { call, apply, put, take, select } from 'redux-saga/effects'
 import { makeId } from '../utils'
 
 // TODO: Need to make this nicer. :(
-import { ajax } from 'js-tinyapi'
+// import { ajax } from 'js-tinyapi'
 
 export function* changePage( action ) {
   switch( action.type ) {

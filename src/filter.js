@@ -16,6 +16,10 @@ const operations = {
     return new Filter('in', field, value)
   },
 
+  ct(field, value) {
+    return new Filter('ct', field, value)
+  },
+
   and(left, right) {
     return new Filter('and', left, right)
   },
@@ -113,8 +117,9 @@ class BasicVisitor extends Visitor {
 
   eq(filter, field, value) {
     // TODO: This needs to go elsewhere.
-    if (value instanceof ID)
+    if (value instanceof ID) {
       value = value.id
+    }
 
     if (value === null) {
       field += '__nu'
@@ -133,7 +138,13 @@ class BasicVisitor extends Visitor {
     if (value instanceof ID)
       value = value.id
     return {
-      [`${field}_in`]: value
+      [`${field}__in`]: value
+    }
+  }
+
+  ct(filter, field, value) {
+    return {
+      [`${field}__ct`]: value
     }
   }
 
@@ -184,6 +195,13 @@ class DBVisitor extends Visitor {
   }
 
   ['in'](filter, field, value) {
+    return this._filter(field, (rec, fldName) => {
+      let v = this.mapValue(rec, fldName, value)
+      return this.db.getModel(rec._type).includes(fldName, rec[fldName], v)
+    })
+  }
+
+  ct(filter, field, value) {
     return this._filter(field, (rec, fldName) => {
       let v = this.mapValue(rec, fldName, value)
       return this.db.getModel(rec._type).includes(fldName, rec[fldName], v)
