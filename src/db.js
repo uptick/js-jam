@@ -456,20 +456,23 @@ export default class DB {
   query(options) {
     const {policy = this.policy, json = false, ...other} = options
     let result
-    if (policy == 'remoteOnly')
+    if (policy == 'remoteOnly') {
       result = this.remoteQuery({...other, json})
-    else if (policy == 'local' && !json)
+    }
+    else if (policy == 'local' && !json) {
       result = this.localQuery(other)
+    }
     else {
       result = this.remoteQuery({...other, json})
-      if (!json)
+      if (!json) {
         result = result.then(() => this.localQuery(other))
+      }
     }
     return result
   }
 
   async remoteQuery(options) {
-    console.debug('Running remote query.')
+    console.log('Running remote query.')
     const {
       type,
       id,

@@ -1,8 +1,8 @@
-import {Map} from 'immutable'
+import {Map, fromJS} from 'immutable'
 
 import DB from './db'
 import Model from './model'
-import {ModelError} from './utils'
+import {toArray, ModelError} from './utils'
 
 export default class Schema {
 
@@ -93,6 +93,13 @@ export default class Schema {
     if (model === undefined)
       throw new ModelError(`Unknown model type: ${data._type}`)
     return model.toData(data, db)
+  }
+
+  toQuerySet(response) {
+    const db = this.db()
+    db.loadJsonApi(response)
+    const results = toArray(response.data).map(x => db.getInstance({_type: x.type, id: x.id}))
+    return fromJS(Array.isArray(response.data) ? results : (results.length ? results[0] : []))
   }
 
   createInstance( type, data, db ) {
