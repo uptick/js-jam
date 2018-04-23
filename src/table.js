@@ -239,8 +239,10 @@ export default class Table {
 
   addRelationship(id, fldName, relatedId) {
     const fld = this.model.getField(fldName)
-    if (relatedId._type != fld.get('type'))
-      throw new ModelError('Cannot add incompatible type: ', relatedId._type, ' to relationship with type: ', fld.get('type'))
+    if (relatedId._type != fld.get('type')) {
+      //      throw new ModelError('Cannot add incompatible type: ', relatedId._type, ' to relationship with type: ', fld.get('type'))
+      return
+    }
     const index = this._getIndex(id)
     this.data = this.data.updateIn(['objects', index, fldName], x => x.add(relatedId))
   }
