@@ -19,6 +19,12 @@ export default class Model {
   merge(options) {
     this.idField = options.idField || 'id'
     this.attributes = fromJS(options.attributes || {})
+
+    // TODO: Shitty workaround. Can't set "size" on immutable records.
+    if (this.attributes.has('size')) {
+      this.attributes = this.attributes.remove('size')
+    }
+
     this.relationships = fromJS(options.relationships || {})
     this.indices = fromJS(options.indices || ['id'])
     this.ops = {}

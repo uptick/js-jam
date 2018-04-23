@@ -32,6 +32,7 @@
     "code": "^5.2.0",
     "css-loader": "^0.23.1",
     "enzyme": "^3.3.0",
+    "enzyme-adapter-react-16": "^1.1.1",
     "enzyme-redux": "^0.2.1",
     "eslint": "^4.9.0",
     "eslint-config-standard": "^10.2.1",
@@ -92,6 +93,5 @@
     "uuid": "^2.0.3"
   },
   "dependencies": {
-    "enzyme-adapter-react-16": "^1.1.1"
   }
 }
