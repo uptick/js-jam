@@ -33,6 +33,7 @@ node_modules
 .node_repl_history
 
 lib
+dist
 example/bundle.js
 **~
 tests/backup.tgz

@@ -1,44 +1,46 @@
-# redux-jam
+# JSON API Models (JAM)
 
-[![npm version](https://badge.fury.io/js/redux-jam.svg)](http://badge.fury.io/js/redux-jam)
-![Downloads](http://img.shields.io/npm/dm/redux-jam.svg?style=flat)
+[![npm version](https://badge.fury.io/js/js-jam.svg)](http://badge.fury.io/js/js-jam)
+![Downloads](http://img.shields.io/npm/dm/js-jam.svg?style=flat)
 
-`redux-jam` is a framework for managing the complexity of multiple data
-sources with different fetching and storage characteristics, while using
-standard, flexible, and known systems, such as Redux.
+JAM is a utility layer for assisting in converting JSON API payloads into a
+convenient client side format, and in converting back to server compatible
+JSON API payloads.
 
-Storing data fetched from a server locally is a very attractive method of
-improving user experience, but it comes with significant difficulties.
-Deciding when to invalidate a locally cached dataset, and how to combine
-remote and local data can be a source of immense complexity. This is
-especially true when building an application designed for offline
-capabilities.
+A schema describing the server side model format (typically automatically
+generated) allows:
+
+ * Data type conversions (e.g. incoming timestamps are converted using `moment`).
+ * Relationship type checking.
+ * Basic validation (e.g. required fields).
+ * Prefill with default values.
+ * Provision of select field options.
 
 ## Installation
 
 ```bash
-npm install redux-jam
+npm install js-jam
 ```
 
 or
 
 ```bash
-yarn add redux-jam
+yarn add js-jam
 ```
 
-Add the JAM model reducer to your root reducer:
+If you happen to be using `js-tinyapi` for your API client, a convenient middleware
+is provided to allow automatic JSON API conversions:
 
 ```js
-import {reducer as model} from 'redux-jam'
+import {jamMiddleware} from 'js-jam'
 
-const rootReducer = combineReducers({
-  model,
-  ...
-})
+api = new Api()
+api.addMiddleware(jamMiddleware)
 
-export default rootReducer
+api.listMovies()  // returns flattened data instead of JSON API
 ```
 
+See [`js-tinyapi`'s documentation](https://github.com/uptick/js-tinyapi) for more details.
 
 ## Defining a Schema
 
@@ -52,7 +54,7 @@ package.
 Schemas are built using the `Schema` class:
 
 ```js
-import {Schema} from 'redux-jam'
+import {Schema} from 'js-jam'
 
 let schema = new Schema()
 ```
@@ -60,7 +62,7 @@ let schema = new Schema()
 To define models in a schema, use the `merge` method, which accepts an object
 argument describing a part of a schema:
 
-```python
+```js
 schema.merge({})
 ```
 
@@ -75,24 +77,15 @@ a JSON-API object. Take for example the following definition of a movie:
   movie: {
     attributes: {
       name: {
-        required: true        
+        required: true
       },
-      duration: {},
       year: {}
     },
     relationships: {
       actors: {
         type: "person",
-        many: true,
-        relatedName: "actedIn"
+        many: true
       }
-    }
-    api: {
-      list: () => {},
-      detail: () => {},
-      create: () => {},
-      update: () => {},
-      delete: () => {}
     }
   },
   person: {
@@ -100,33 +93,20 @@ a JSON-API object. Take for example the following definition of a movie:
       name: {
         required: true
       }
-    },
-    api: {
-      list: () => {},
-      detail: () => {},
-      create: () => {},
-      update: () => {},
-      delete: () => {}
     }
   }
 }
 ```
 
-This defines two models: `movie` and `person`. The `api` sections of each
-model are placeholders for calls to API endpoints. They should return promises,
-which in turn return JSON-API structured data.
+This defines two models: `movie` and `person`.
 
 Options for attributes are currently limited to `required`.
 
 Options for relationships:
 
  * type
-
  * required
-
  * many
-
- * relatedName
 
 ### Django + DRF
 
@@ -135,69 +115,116 @@ automatically, which is particularly convenient.
 
 Refer to [Django-JAM](https://github.com/ABASystems/django-jam)
 
-## Loading Data
+## Manipulating Data
 
-Fetching data from the server is achieved with a higher order comonent,
-`withView`. Views collect a set of one or more queries and provide the
-resultant data to a React component.
-
-The following snippet shows a React component that loads movies whose
-title contains the term "Rocky", and sorts them on year:
+Once data has been loaded from your server, conversion to a local format
+is achieved via a call to Scema's method `fromJsonApi`:
 
 ```js
-import React from 'react'
-import {withView} from 'redux-jam'
-import schema from 'models'
+import schema from 'mySchema'
 
-const view = schema.view({
-  name: 'movieList',
-  queries: {
-    movies: {
-      type: 'movie',
-      filter: F.contains('title', 'Rocky'),
-      sort: 'year'
-    }
-  }
-})
+const jsonApiData = fetch('/movies/?include=actors')
 
-@withView(view)
-class MoviesList extends React.Component {
-  render() {
-    const {moviesList} = this.props
-    const {loading, queries} = moviesList
-    if (!loading) {
-      return (
-        <ul>
-          {queries.movies.map(m => <li>{m.title}</li>}
-        </ul>
-      )
+/*
+  jsonApiData: {
+    data: [
+      {
+        type: 'movie',
+        id: 1,
+          attributes: {
+            title: 'Rocky'
+          },
+          relationships: {
+            actors: {
+            data: [
+              {
+                type: 'person',
+                id: 1
+              },
+              {
+                type: 'person',
+                id: 2
+              }
+            ]
+          }
+        }
+      },
+      {
+        type: 'movie',
+        id: 2,
+        attributes: {
+          title: 'Rocky 2'
+        },
+        relationships: {
+          actors: {
+            data: [
+              {
+                type: 'person',
+                id: 1
+              }
+            ]
+          }
+        }
+      }
     }
-    else
-      return null
-  }
-}
+  ]
+  included: [
+    {
+      type: 'person',
+      id: 1,
+      attributes: {
+        name: 'Sylvester Stalone'
+      }
+    },
+    {
+      type: 'person',
+      id: 2,
+      attributes: {
+        name: 'Dolf Lundrem'
+      }
+    }
+  ]
+*/
+
+const data = schema.fromJsonApi(jsonApiData)
+
+/*
+  data: [
+    {
+      _type: 'movie',
+      id: 1,
+      title: 'Rocky'
+      actors: [
+        {
+          _type: 'person',
+          id: 1,
+          name: 'Sylvester Stalone'
+        },
+        {
+          _type: 'person',
+          id: 2,
+          name: 'Dolf Lundrem'
+        }
+      ]
+    },
+    {
+      _type: 'movie',
+      id: 2,
+      title: 'Rocky 2'
+      actors: [
+        {
+          _type: 'person',
+          id: 1,
+          name: 'Sylvester Stalone'
+        }
+      ]
+    }
+  ]
+*/
+
+schema.toJsonApi(data)
 ```
 
-## Mutating data
-
-`redux-jam` provides a form like interface for mutating data.
-
-```js
-import React from 'react'
-import {withForm} from 'redux-jam'
-import schema from 'models'
-
-@withForm({type: 'movie'})
-class MoviesList extends React.Component {
-  render() {
-    const {renderField} = this.props
-    // TODO
-  }
-}
-```
-
-## Filtering
-
-
-
-## Transactions
+Note that when linking relationships together each instance of a resource is one
+and the same. So, in the above example, both instances of the person resource
+with ID 1 are actually the same JavaScript object.

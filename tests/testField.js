@@ -1,15 +1,11 @@
-import 'isomorphic-fetch'
 import {expect} from 'code'
 
-import {OrderedSet} from 'immutable'
 import moment from 'moment'
 
 import Field from '../src/field'
-import {makeId, isRecord} from '../src/utils'
+import {makeId} from '../src/utils'
 
-// Don't dump stuff to the terminal.
-console.debug = () => {}
-console.warn = () => {}
+import './silence'
 
 describe('Field', function() {
 
@@ -250,28 +246,26 @@ describe('Field', function() {
         })
 
         it('with empty sets', function() {
-          let a = new OrderedSet()
-          let b = new OrderedSet()
-          expect(Field.equals('manytomany', a, b)).to.be.true()
+          expect(Field.equals('manytomany', [], [])).to.be.true()
         })
 
         it('with equal values', function() {
-          let a = new OrderedSet([
+          let a = [
             makeId('a', 1),
             makeId('b', 1)
-          ])
-          let b = new OrderedSet([
+          ]
+          let b = [
             makeId('a', 1),
             makeId('b', 1)
-          ])
+          ]
           expect(Field.equals('manytomany', a, b)).to.be.true()
         })
 
         it('with the same object', function() {
-          let a = new OrderedSet([
+          let a = [
             makeId('a', 1),
             makeId('b', 1)
-          ])
+          ]
           expect(Field.equals('manytomany', a, a)).to.be.true()
         })
 
@@ -296,27 +290,27 @@ describe('Field', function() {
         })
 
         it('with extra elements', function() {
-          let a = new OrderedSet([
+          let a = [
             makeId('a', 1),
             makeId('b', 1)
-          ])
-          let b = new OrderedSet([
+          ]
+          let b = [
             makeId('a', 1),
             makeId('b', 1),
             makeId('c', 1)
-          ])
+          ]
           expect(Field.equals('manytomany', a, b)).to.be.false()
         })
 
         it('with unequal values', function() {
-          let a = new OrderedSet([
+          let a = [
             makeId('a', 1),
             makeId('b', 1)
-          ])
-          let b = new OrderedSet([
+          ]
+          let b = [
             makeId('a', 1),
             makeId('b', 2)
-          ])
+          ]
           expect(Field.equals('manytomany', a, b)).to.be.false()
         })
 
@@ -450,20 +444,11 @@ describe('Field', function() {
 
       describe('returns an ID', function() {
 
-        it('with an ID', function() {
-          let a = makeId('a', 1)
-          let r = Field.toInternal('foreignkey', a)
-          expect(r._type).to.equal('a')
-          expect(r.id).to.equal(1)
-          expect(isRecord(r)).to.be.true()
-        })
-
         it('with an object', function() {
-          let a = {_type: 'a', id: 1}
+          let a = {type: 'a', id: 1}
           let r = Field.toInternal('foreignkey', a)
           expect(r._type).to.equal('a')
           expect(r.id).to.equal(1)
-          expect(isRecord(r)).to.be.true()
         })
 
       })
@@ -476,55 +461,32 @@ describe('Field', function() {
 
         it('with null', function() {
           let r = Field.toInternal('manytomany', null)
-          expect(OrderedSet.isOrderedSet(r)).to.be.true()
-          expect(r.size).to.equal(0)
+          expect(r.length).to.equal(0)
         })
 
         it('with undefined', function() {
           let r = Field.toInternal('manytomany', undefined)
-          expect(OrderedSet.isOrderedSet(r)).to.be.true()
-          expect(r.size).to.equal(0)
+          expect(r.length).to.equal(0)
         })
 
         it('with empty string', function() {
           let r = Field.toInternal('manytomany', '')
-          expect(OrderedSet.isOrderedSet(r)).to.be.true()
-          expect(r.size).to.equal(0)
+          expect(r.length).to.equal(0)
         })
 
         it('with empty array', function() {
           let r = Field.toInternal('manytomany', [])
-          expect(OrderedSet.isOrderedSet(r)).to.be.true()
-          expect(r.size).to.equal(0)
-        })
-
-        it('with empty OrderedSet', function() {
-          let r = Field.toInternal('manytomany', new OrderedSet())
-          expect(OrderedSet.isOrderedSet(r)).to.be.true()
-          expect(r.size).to.equal(0)
+          expect(r.length).to.equal(0)
         })
 
       })
 
-      describe('returns a filled OrderedSet', function() {
-
-        it('with an array of IDs', function() {
-          let a = [makeId('a', 1), makeId('a', 2)]
-          let r = Field.toInternal('manytomany', a)
-          expect(r.equals(new OrderedSet(a))).to.be.true()
-        })
+      describe('returns a filled set', function() {
 
         it('with an array of objects', function() {
-          let a = [{_type: 'a', id: 1}, {_type: 'a', id: 2}]
+          let a = [{type: 'a', id: 1}, {type: 'a', id: 2}]
           let r = Field.toInternal('manytomany', a)
-          let o = new OrderedSet(a.map(x => makeId(x)))
-          expect(r.equals(o)).to.be.true()
-        })
-
-        it('with an OrderedSet of IDs', function() {
-          let a = new OrderedSet([makeId('a', 1), makeId('a', 2)])
-          let r = Field.toInternal('manytomany', a)
-          expect(r.equals(a)).to.be.true()
+          expect(r).to.equal(a.map(x => makeId(x)))
         })
 
       })
@@ -630,13 +592,7 @@ describe('Field', function() {
         it('with an ID', function() {
           let a = makeId('a', 1)
           let r = Field.fromInternal('foreignkey', a)
-          expect(r).to.equal({_type: 'a', id: 1})
-        })
-
-        it('with an object', function() {
-          let a = {_type: 'a', id: 1}
-          let r = Field.fromInternal('foreignkey', a)
-          expect(r).to.equal({_type: 'a', id: 1})
+          expect(r).to.equal({type: 'a', id: 1})
         })
 
       })
@@ -662,8 +618,8 @@ describe('Field', function() {
           expect(r).to.equal([])
         })
 
-        it('with empty OrderedSet', function() {
-          let r = Field.fromInternal('manytomany', new OrderedSet())
+        it('with empty array', function() {
+          let r = Field.fromInternal('manytomany', [])
           expect(r).to.equal([])
         })
 
@@ -671,126 +627,10 @@ describe('Field', function() {
 
       describe('returns a filled array', function() {
 
-        it('with an OrderedSet of IDs', function() {
-          let a = new OrderedSet([makeId('a', 1), makeId('a', 2)])
+        it('with an array of IDs', function() {
+          let a = [makeId('a', 1), makeId('a', 2)]
           let r = Field.fromInternal('manytomany', a)
-          expect(r).to.equal(a.toJS())
-        })
-
-      })
-
-    })
-
-  })
-
-  describe('conversion to indexable', function() {
-
-    describe('with unknown type', function() {
-
-      describe('returns null', function() {
-
-        it('with null', function() {
-          expect(Field.toIndexable('unknown', null)).to.be.null()
-        })
-
-        it('with undefined', function() {
-          expect(Field.toIndexable('unknown', undefined)).to.be.null()
-        })
-
-      })
-
-      it('returns the same value', function() {
-        expect(Field.toIndexable('unknown', '')).to.equal('')
-        expect(Field.toIndexable('unknown', 'a')).to.equal('a')
-        expect(Field.toIndexable('unknown', 1)).to.equal(1)
-      })
-
-    })
-
-    describe('with boolean type', function() {
-
-      describe('returns null', function() {
-
-        it('with null', function() {
-          expect(Field.toIndexable('boolean', null)).to.be.null()
-        })
-
-        it('with undefined', function() {
-          expect(Field.toIndexable('boolean', undefined)).to.be.null()
-        })
-
-        it('with empty string', function() {
-          expect(Field.toIndexable('boolean', '')).to.be.null()
-        })
-
-      })
-
-      it('returns same value', function() {
-        expect(Field.toIndexable('boolean', true)).to.be.true()
-        expect(Field.toIndexable('boolean', false)).to.be.false()
-      })
-
-    })
-
-    describe('with timestamp type', function() {
-
-      describe('returns null', function() {
-
-        it('with null', function() {
-          expect(Field.toIndexable('timestamp', null)).to.be.null()
-        })
-
-        it('with undefined', function() {
-          expect(Field.toIndexable('timestamp', undefined)).to.be.null()
-        })
-
-        it('with empty string', function() {
-          expect(Field.toIndexable('timestamp', '')).to.be.null()
-        })
-
-      })
-
-      describe('returns an ISO8601 string', function() {
-
-        it('with a moment object', function() {
-          let a = '2017-03-28T05:40:41.000Z'
-          expect(Field.toIndexable('timestamp', moment(a))).to.equal(a)
-        })
-
-      })
-
-    })
-
-    describe('with foreignkey type', function() {
-
-      describe('returns null', function() {
-
-        it('with null', function() {
-          expect(Field.toIndexable('foreignkey', null)).to.be.null()
-        })
-
-        it('with undefined', function() {
-          expect(Field.toIndexable('foreignkey', undefined)).to.be.null()
-        })
-
-        it('with empty string', function() {
-          expect(Field.toIndexable('foreignkey', '')).to.be.null()
-        })
-
-      })
-
-      describe('returns a merged string', function() {
-
-        it('with an ID', function() {
-          let a = makeId('a', 1)
-          let r = Field.toIndexable('foreignkey', a)
-          expect(r).to.equal('a|1')
-        })
-
-        it('with an object', function() {
-          let a = {_type: 'a', id: 1}
-          let r = Field.toIndexable('foreignkey', a)
-          expect(r).to.equal('a|1')
+          expect(r).to.equal(a.map(x => ({type: x._type, id: x.id})))
         })
 
       })
@@ -819,11 +659,11 @@ describe('Field', function() {
 
       })
 
-      describe('returns array of from and to values', function() {
+      describe('returns to value', function() {
 
         it('with different values', function() {
-          expect(Field.diff('unknown', 'a', 'b')).to.equal(['a', 'b'])
-          expect(Field.diff('unknown', 0, 1)).to.be.equal([0, 1])
+          expect(Field.diff('unknown', 'a', 'b')).to.equal('b')
+          expect(Field.diff('unknown', 0, 1)).to.be.equal(1)
         })
 
       })
@@ -842,8 +682,8 @@ describe('Field', function() {
         })
 
         it('with the same values', function() {
-          let a = new OrderedSet([makeId('a', 1), makeId('a', 2)])
-          let b = new OrderedSet([makeId('a', 1), makeId('a', 2)])
+          let a = [makeId('a', 1), makeId('a', 2)]
+          let b = [makeId('a', 1), makeId('a', 2)]
           expect(Field.diff('manytomany', a, b)).to.be.null()
         })
 
@@ -852,16 +692,16 @@ describe('Field', function() {
       describe('returns subtracted sets', function() {
 
         it('with different values', function() {
-          let a = new OrderedSet([makeId('a', 1), makeId('b', 1)])
-          let b = new OrderedSet([makeId('a', 1), makeId('a', 2)])
-          let c = new OrderedSet([makeId('b', 1)])
-          let d = new OrderedSet([makeId('a', 2)])
+          let a = [makeId('a', 1), makeId('b', 1)]
+          let b = [makeId('a', 1), makeId('a', 2)]
+          let c = [makeId('b', 1)]
+          let d = [makeId('a', 2)]
           let e = Field.diff('manytomany', a, b)
           let f = Field.diff('manytomany', b, a)
-          expect(e[0].equals(c)).to.be.true()
-          expect(e[1].equals(d)).to.be.true()
-          expect(f[0].equals(d)).to.be.true()
-          expect(f[1].equals(c)).to.be.true()
+          expect(e[0]).to.equal(c)
+          expect(e[1]).to.equal(d)
+          expect(f[0]).to.equal(d)
+          expect(f[1]).to.equal(c)
         })
 
       })
@@ -870,45 +710,4 @@ describe('Field', function() {
 
   })
 
-  describe('applyDiff', function() {
-
-    describe('with unknown type', function() {
-
-      it('uses "to" value', function() {
-        let a = 'hello'
-        let d = ['hello', 'world']
-        let r = Field.applyDiff('unknown', a, d)
-        expect(r).to.equal('world')
-      })
-
-      it('uses "from" value with reverse', function() {
-        let a = 'hello'
-        let d = ['hello', 'world']
-        let r = Field.applyDiff('unknown', a, d, true)
-        expect(r).to.equal('hello')
-      })
-
-    })
-
-    describe('with manytomany type', function() {
-
-      it('removes "from" and adds "to"', function() {
-        let a = new OrderedSet([makeId('a', 1), makeId('b', 1)])
-        let b = new OrderedSet([makeId('a', 1), makeId('a', 2)])
-        let d = Field.diff('manytomany', a, b)
-        let r = Field.applyDiff('manytomany', a, d)
-        expect(r.toJS()).to.equal(b.toJS())
-      })
-
-      it('adds "from" and removes "to" with reverse', function() {
-        let a = new OrderedSet([makeId('a', 1), makeId('b', 1)])
-        let b = new OrderedSet([makeId('a', 1), makeId('a', 2)])
-        let d = Field.diff('manytomany', a, b)
-        let r = Field.applyDiff('manytomany', b, d, true)
-        expect(r.equals(a)).to.be.true()
-      })
-
-    })
-
-  })
 })
