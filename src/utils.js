@@ -42,3 +42,7 @@ export function toList( x ) {
     return x
   return new List([ x ])
 }
+
+export function snakeToCamel(value) {
+  return value.replace(/(\_\w)/g, match => match[1].toUpperCase())
+}

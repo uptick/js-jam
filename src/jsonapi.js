@@ -1,3 +1,5 @@
+import {snakeToCamel} from './utils'
+
 /**
  * Flatten a single JsonApi resource.
  */
@@ -8,10 +10,10 @@ export function flattenJsonApiResource(schema, resource, table = {}) {
   data.id = resource.id
   const model = schema.getModel(data._type)
   for (const [name, value] of Object.entries(resource.attributes || {})) {
-    data[name] = model.fieldToInternal(name, value)
+    data[snakeToCamel(name)] = model.fieldToInternal(name, value)
   }
   for (const [name, value] of Object.entries(resource.relationships || {})) {
-    data[name] = flattenJsonApiData(schema, value.data, table)
+    data[snakeToCamel(name)] = flattenJsonApiData(schema, value.data, table)
   }
   table[tableKey] = data
   return data

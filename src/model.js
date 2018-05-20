@@ -1,4 +1,4 @@
-import {makeId} from './utils'
+import {makeId, snakeToCamel} from './utils'
 import Field from './field'
 
 export default class Model {
@@ -22,7 +22,7 @@ export default class Model {
   attributesToJsonApi(data) {
     const attrs = {}
     for (const name of Object.keys(this.attributes)) {
-      const value = data[name]
+      const value = data[snakeToCamel(name)]
       if (value !== undefined) {
         attrs[name] = this.fieldFromInternal(name, value)
       }
@@ -33,7 +33,7 @@ export default class Model {
   relationshipsToJsonApi(data) {
     const rels = {}
     for (const name of Object.keys(this.relationships)) {
-      const value = data[name]
+      const value = data[snakeToCamel(name)]
       if (value !== undefined) {
         rels[name] = {
           data: this.fieldFromInternal(name, value)
