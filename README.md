@@ -228,3 +228,60 @@ schema.toJsonApi(data)
 Note that when linking relationships together each instance of a resource is one
 and the same. So, in the above example, both instances of the person resource
 with ID 1 are actually the same JavaScript object.
+
+## Examples
+
+Below we'll put together the above snippets into working examples. All examples use
+the following JSON schema file:
+
+```json
+// schema.json
+
+{
+  "movie": {
+    "attributes": {
+      "name": {
+        "required": true
+      },
+      "year": {}
+    },
+    "relationships": {
+      "actors": {
+        "type": "person",
+        "many": true
+      }
+    }
+  },
+  "person": {
+    "attributes": {
+      "name": {
+        "required": true
+      }
+    }
+  }
+}
+```
+
+### Manual Conversion
+
+```js
+import Schema from 'js-jam'
+
+const schema = new Schema(require('./schema.json'))
+
+const data = schema.fromJsonApi(loadMyData())
+```
+
+### TinyApi Middleware
+
+```js
+import Schema, {jamMiddleware} from 'js-jam'
+import Api from 'js-tinyapi'
+
+const api = new Api(require('./api.json'))
+api.addMiddleware(jamMiddleware)
+
+const schema = new Schema(require('./schema.json'))
+
+const data = api.moviesList()
+```
