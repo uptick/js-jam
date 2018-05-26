@@ -46,3 +46,12 @@ export function toList( x ) {
 export function snakeToCamel(value) {
   return value.replace(/(\_\w)/g, match => match[1].toUpperCase())
 }
+
+export function lower(value) {
+  if (value) {
+    return value.toLowerCase()
+  }
+  else {
+    return value
+  }
+}

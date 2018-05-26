@@ -1,6 +1,6 @@
 import moment from 'moment'
 
-import {isArray, isNil, isEmpty, makeId} from './utils'
+import {isArray, isNil, isEmpty, makeId, lower} from './utils'
 
 export default class Field {
 
@@ -161,6 +161,7 @@ let fields = {
   integer: new NonTextField(),
   float: new NonTextField(),
   timestamp: new TimestampField(),
+  date: new TimestampField(),
   boolean: new BooleanField(),
   enum: new NonTextField(),
   foreignkey: new ForeignKeyField(),
@@ -170,22 +171,22 @@ let fields = {
 let unknownField = new Field()
 
 Field.equals = function(type, a, b) {
-  const fld = fields[type]
+  const fld = fields[lower(type)]
   return fld ? fld.equals(a, b) : unknownField.equals(a, b)
 }
 
 Field.toInternal = function(type, value) {
-  const fld = fields[type]
+  const fld = fields[lower(type)]
   return fld ? fld.toInternal(value) : unknownField.toInternal(value)
 }
 
 Field.fromInternal = function(type, value) {
-  const fld = fields[type]
+  const fld = fields[lower(type)]
   return fld ? fld.fromInternal(value) : unknownField.fromInternal(value)
 }
 
 Field.diff = function(type, from, to) {
-  const fld = fields[type]
+  const fld = fields[lower(type)]
   return fld ? fld.diff(from, to) : unknownField.diff(from, to)
 }
 
