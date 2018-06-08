@@ -34,7 +34,10 @@ export default class Schema {
     return flattenJsonApiResponse(this, response)
   }
 
-  toJsonApi(data) {
+  toJsonApi(data, type) {
+    if (!!type) {
+      data._type = type
+    }
     return renderJsonApi(this, data)
   }
 

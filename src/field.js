@@ -61,6 +61,14 @@ class NonTextField extends Field {
 
 }
 
+class FloatField extends NonTextField {
+
+  _toInternal(value) {
+    return parseFloat(value)
+  }
+
+}
+
 class BooleanField extends NonTextField {
 
   _toInternal(value, db) {
@@ -87,6 +95,14 @@ class TimestampField extends NonTextField {
 
   _fromInternal(value) {
     return value.toISOString()
+  }
+
+}
+
+class DateField extends TimestampField {
+
+  _fromInternal(value) {
+    return value.format('YYYY-MM-DD')
   }
 
 }
@@ -159,9 +175,12 @@ class ManyToManyField extends ForeignKeyField {
 
 let fields = {
   integer: new NonTextField(),
-  float: new NonTextField(),
+  float: new FloatField(),
+  double: new FloatField(),
+  decimal: new FloatField(),
   timestamp: new TimestampField(),
-  date: new TimestampField(),
+  datetime: new TimestampField(),
+  date: new DateField(),
   boolean: new BooleanField(),
   enum: new NonTextField(),
   foreignkey: new ForeignKeyField(),

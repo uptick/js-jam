@@ -11,6 +11,10 @@ export function makeId(type, id) {
   }
 }
 
+export function isId(value) {
+  return /^\d+$/.test(String(value))
+}
+
 export function isIterable( x ) {
   if( x === null )
     return false
