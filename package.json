@@ -1,9 +1,12 @@
 {
   "name": "js-jam",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A set of utilities for conveniently working with JSON-API data.",
   "esnext": "src/index.js",
   "main": "dist/index.js",
+  "files": [
+    "src/**"
+  ],
   "scripts": {
     "build": "webpack --mode development --progress --colors",
     "watch": "webpack --mode development --progress --colors --watch",
