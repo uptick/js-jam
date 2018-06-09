@@ -1,6 +1,6 @@
 {
   "name": "js-jam",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A set of utilities for conveniently working with JSON-API data.",
   "esnext": "src/index.js",
   "main": "dist/index.js",
