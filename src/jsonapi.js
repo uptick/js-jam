@@ -4,6 +4,12 @@ import {snakeToCamel} from './utils'
  * Flatten a single JsonApi resource.
  */
 export function flattenJsonApiResource(schema, resource, table = {}) {
+  if (resource.type === undefined) {
+    console.warning(
+      'Unable to process JSON-API as a resource. Please consider changing the content-type.'
+    )
+    return data
+  }
   const tableKey = `${resource.type}|${resource.id}`
   const data = table[tableKey] || {}
   data._type = resource.type
