@@ -5,7 +5,7 @@ import {snakeToCamel} from './utils'
  */
 export function flattenJsonApiResource(schema, resource, table = {}) {
   if (resource.type === undefined) {
-    console.warning(
+    console.warn(
       'Unable to process JSON-API as a resource. Please consider changing the content-type.'
     )
     return data
