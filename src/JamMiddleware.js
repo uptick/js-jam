@@ -13,7 +13,7 @@ export default class JamMiddleware extends Middleware {
       response.data = this.schema.fromJsonApi(response.data)
       console.debug('JamMiddleware incoming conversion: ', response.data)
     }
-    return response
+    return response.data
   }
 
 }
